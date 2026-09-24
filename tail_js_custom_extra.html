@@ -1,0 +1,93 @@
+<style>
+  #ai-chat-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #1fa8c9;
+    color: white;
+    font-size: 26px;
+    border: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background 0.2s;
+  }
+  #ai-chat-btn:hover {
+    transform: scale(1.08);
+    background: #178fa8;
+  }
+  #ai-sidebar-container {
+    position: fixed;
+    top: 56px;
+    right: -440px;
+    width: 430px;
+    height: calc(100vh - 56px);
+    background: #ffffff;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    z-index: 99998;
+    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #e0e0e0;
+  }
+  #ai-sidebar-container.open {
+    right: 0;
+  }
+  #ai-sidebar-header {
+    padding: 10px 16px;
+    background: #20a7c9;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  #ai-close-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+  }
+  #ai-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+</style>
+
+<button id="ai-chat-btn" title="Trò chuyện với AI Data Analyst">🤖</button>
+
+<div id="ai-sidebar-container">
+  <div id="ai-sidebar-header">
+    <span>🤖 AI Data Analyst (Trino + Iceberg)</span>
+    <button id="ai-close-btn" title="Đóng">&times;</button>
+  </div>
+  <iframe id="ai-iframe" src="http://localhost:8501/?embed=true"></iframe>
+</div>
+
+<script>
+  (function() {
+    var btn = document.getElementById('ai-chat-btn');
+    var sidebar = document.getElementById('ai-sidebar-container');
+    var closeBtn = document.getElementById('ai-close-btn');
+
+    if (btn && sidebar && closeBtn) {
+      btn.onclick = function() {
+        sidebar.classList.toggle('open');
+      };
+      closeBtn.onclick = function() {
+        sidebar.classList.remove('open');
+      };
+    }
+  })();
+</script>

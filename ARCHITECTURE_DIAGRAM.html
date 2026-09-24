@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lakehouse Architecture Diagram</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .glow-hover:hover {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.35);
+      transform: translateY(-2px);
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] p-6 font-sans">
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Top Banner: Orchestration & Docker -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🐳</span>
+        <div>
+          <h2 class="font-bold text-sm tracking-wide uppercase text-[var(--muted-foreground)]">Containerization & Environment</h2>
+          <p class="font-semibold text-base">Docker Compose (Local Single-Node Cluster on Windows D:\)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2">
+        <span class="text-xl">⚙️</span>
+        <div>
+          <span class="text-xs text-[var(--muted-foreground)] block">Orchestrator & Ingestion</span>
+          <span class="text-sm font-semibold text-blue-500">Python ETL Scripts (Ready for Airflow / Dagster)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Architecture Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+
+      <!-- Column 1: Source & Ingest (2 cols) -->
+      <div class="md:col-span-3 flex flex-col gap-4">
+        <!-- Source -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 glow-hover transition-all flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="badge bg-amber-500/10 text-amber-500 border border-amber-500/20">Data Sources</span>
+              <span class="text-xl">🏬</span>
+            </div>
+            <h3 class="font-bold text-base mb-1">TPC-DS Benchmark</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mb-3">Dữ liệu bán lẻ đa kênh chuẩn enterprise (Scale Factor 1 ~ 2.88M rows).</p>
+            <div class="space-y-1.5 text-xs bg-[var(--background)] p-2.5 rounded-lg border border-[var(--border)]">
+              <div class="flex justify-between"><span>• Store Sales</span><span class="text-[var(--muted-foreground)]">Cửa hàng</span></div>
+              <div class="flex justify-between"><span>• Web Sales</span><span class="text-[var(--muted-foreground)]">Thương mại ĐT</span></div>
+              <div class="flex justify-between"><span>• Item / Customer</span><span class="text-[var(--muted-foreground)]">Chiều Dims</span></div>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[var(--border)] text-center text-xs text-[var(--muted-foreground)]">
+            Trino Connector / MySQL / CSV
+          </div>
+        </div>
+
+        <!-- Ingest Arrow -->
+        <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-center">
+          <div class="text-xs font-semibold text-blue-500 flex items-center justify-center gap-1.5">
+            <span>🐍 Python Ingest Engine</span>
+            <span>➔</span>
+          </div>
+          <p class="text-[11px] text-[var(--muted-foreground)] mt-0.5">Trino DBAPI / PySpark connector</p>
+        </div>
+      </div>
+
+      <!-- Column 2: Data Lakehouse (Medallion) (5 cols) -->
+      <div class="md:col-span-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 glow-hover transition-all flex flex-col justify-between">
+        <div>
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🧊</span>
+              <div>
+                <h3 class="font-bold text-lg leading-tight">Apache Iceberg Lakehouse</h3>
+                <span class="text-xs text-[var(--muted-foreground)]">ACID Transactions • Parquet Format • MinIO S3</span>
+              </div>
+            </div>
+            <span class="badge bg-blue-500/10 text-blue-500 border border-blue-500/20">Storage Tier</span>
+          </div>
+
+          <!-- Medallion Tiers -->
+          <div class="space-y-3 mb-4">
+            <!-- Bronze -->
+            <div class="bg-[var(--background)] border-l-4 border-amber-700 border-t border-r border-b border-[var(--border)] rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-xs text-amber-600 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-amber-700 inline-block"></span>
+                  BRONZE (Raw Ingestion)
+                </span>
+                <span class="text-[11px] font-mono text-[var(--muted-foreground)]">retail_bronze</span>
+              </div>
+              <p class="text-xs mt-1 text-[var(--muted-foreground)]">Bản sao nguyên trạng từ nguồn + mốc thời gian <code class="text-[11px] bg-amber-500/10 text-amber-500 px-1 rounded">_ingested_at</code>.</p>
+            </div>
+
+            <!-- Silver -->
+            <div class="bg-[var(--background)] border-l-4 border-slate-400 border-t border-r border-b border-[var(--border)] rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-xs text-slate-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                  SILVER (Cleaned & Conformed)
+                </span>
+                <span class="text-[11px] font-mono text-[var(--muted-foreground)]">retail_silver</span>
+              </div>
+              <p class="text-xs mt-1 text-[var(--muted-foreground)]">Lọc dữ liệu rác, xử lý NULL bằng COALESCE, ép kiểu và chuẩn hóa Dimension.</p>
+            </div>
+
+            <!-- Gold -->
+            <div class="bg-[var(--background)] border-l-4 border-yellow-500 border-t border-r border-b border-[var(--border)] rounded-xl p-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-xs text-yellow-500 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-yellow-500 inline-block"></span>
+                  GOLD (Marts & Semantic)
+                </span>
+                <span class="text-[11px] font-mono text-[var(--muted-foreground)]">retail_gold</span>
+              </div>
+              <p class="text-xs mt-1 text-[var(--muted-foreground)]">Pre-computed KPIs (<code class="text-[11px]">profit_margin_pct</code>, <code class="text-[11px]">net_revenue</code>) và View ngữ nghĩa trung tâm.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Catalog & Storage Meta Footer -->
+        <div class="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--border)] text-xs">
+          <div class="bg-[var(--background)] p-2 rounded-lg border border-[var(--border)] text-center">
+            <span class="block text-[var(--muted-foreground)] text-[10px]">OBJECT STORAGE</span>
+            <span class="font-semibold text-emerald-500">MinIO (S3 API :9000)</span>
+          </div>
+          <div class="bg-[var(--background)] p-2 rounded-lg border border-[var(--border)] text-center">
+            <span class="block text-[var(--muted-foreground)] text-[10px]">METASTORE CATALOG</span>
+            <span class="font-semibold text-indigo-500">PostgreSQL (JDBC :5433)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Compute & Apps (4 cols) -->
+      <div class="md:col-span-4 flex flex-col gap-4">
+
+        <!-- Trino Query Engine -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 glow-hover transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">⚡</span>
+              <h3 class="font-bold text-base">Trino Query Engine</h3>
+            </div>
+            <span class="badge bg-purple-500/10 text-purple-500 border border-purple-500/20">Port 8080</span>
+          </div>
+          <p class="text-xs text-[var(--muted-foreground)] mb-2">Động cơ phân tán xử lý SQL trên RAM (In-Memory Vectorized). Tốc độ &lt; 0.3s.</p>
+          <div class="text-[11px] font-mono bg-[var(--background)] p-2 rounded-lg border border-[var(--border)] text-blue-500">
+            Catalogs: iceberg • lakehouse • tpcds
+          </div>
+        </div>
+
+        <!-- Superset BI -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 glow-hover transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">📊</span>
+              <h3 class="font-bold text-base">Apache Superset</h3>
+            </div>
+            <span class="badge bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">Port 8089</span>
+          </div>
+          <p class="text-xs text-[var(--muted-foreground)] mb-2">Visualization, KPI Dashboards, SQL Lab. Tự động liên kết sẵn 4 Datasets.</p>
+          <div class="text-[11px] bg-cyan-500/10 text-cyan-500 px-2 py-1 rounded border border-cyan-500/20 text-center font-medium">
+            🎯 Nhúng sẵn AI Chatbot Sidebar Drawer
+          </div>
+        </div>
+
+        <!-- AI Assistant / GenAI -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 glow-hover transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🤖</span>
+              <h3 class="font-bold text-base">AI Data Assistant (Text-to-SQL)</h3>
+            </div>
+            <span class="badge bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Port 8501</span>
+          </div>
+          <p class="text-xs text-[var(--muted-foreground)] mb-2">Tự động chuyển câu hỏi tự nhiên thành Trino SQL & vẽ biểu đồ.</p>
+          <div class="flex items-center justify-between text-[11px] bg-[var(--background)] p-2 rounded-lg border border-[var(--border)]">
+            <span class="text-emerald-500 font-medium">⚡ DeepSeek-V4-Flash / Gemini</span>
+            <span class="text-[var(--muted-foreground)]">Fallback: Smart Rules</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Workflow Summary Footnote -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center text-xs text-[var(--muted-foreground)] flex items-center justify-center gap-2">
+      <span class="font-semibold text-[var(--foreground)]">Luồng dữ liệu:</span>
+      <span>Nguồn (TPC-DS)</span> ➔
+      <span>Bronze (Thô)</span> ➔
+      <span>Silver (Sạch)</span> ➔
+      <span>Gold (Marts)</span> ➔
+      <span>Trino SQL Engine</span> ➔
+      <span>Superset BI & AI Chatbot</span>
+    </div>
+
+  </div>
+</body>
+</html>
