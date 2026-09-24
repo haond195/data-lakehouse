@@ -283,7 +283,7 @@ for msg in st.session_state.messages:
             st.code(msg["sql"], language="sql")
         if "df" in msg:
             st.dataframe(msg["df"], use_container_width=True)
-        if "chart" in msg:
+        if msg.get("chart"):
             col_x, col_y = msg["chart"]
             st.bar_chart(msg["df"].set_index(col_x)[col_y])
 
@@ -327,17 +327,25 @@ if prompt:
             st.dataframe(df, use_container_width=True)
 
             chart_cols = None
+            for col in df.columns[1:]:
+                try:
+                    df[col] = pd.to_numeric(df[col])
+                except Exception:
+                    pass
+
             if len(df.columns) >= 2 and pd.api.types.is_numeric_dtype(df[df.columns[1]]):
                 st.bar_chart(df.set_index(df.columns[0])[df.columns[1]])
                 chart_cols = (df.columns[0], df.columns[1])
 
-            st.session_state.messages.append({
+            res_payload = {
                 "role": "assistant",
                 "content": f"Kết quả phân tích từ Lakehouse ({engine_used}):",
                 "sql": sql,
-                "df": df,
-                "chart": chart_cols
-            })
+                "df": df
+            }
+            if chart_cols:
+                res_payload["chart"] = chart_cols
+            st.session_state.messages.append(res_payload)
 
         except Exception as e:
             err_msg = f"Lỗi truy vấn Trino: {e}"
