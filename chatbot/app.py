@@ -83,18 +83,39 @@ def get_trino_conn():
         schema="retail_gold"
     )
 
-SYSTEM_PROMPT = """
-You are an expert Trino SQL Data Analyst for an Apache Iceberg Lakehouse.
+@st.cache_data(ttl=300)
+def get_dynamic_schema() -> str:
+    try:
+        conn = get_trino_conn()
+        cur = conn.cursor()
+        tables = [
+            ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
+            ("iceberg.retail_gold.mart_monthly_store_performance", "Store Performance (Hiệu suất cửa hàng theo tháng)"),
+            ("iceberg.retail_gold.customer_gold", "Customer Dimension (Khách hàng)")
+        ]
+        parts = []
+        for tbl, desc in tables:
+            try:
+                cur.execute(f"DESCRIBE {tbl}")
+                cols = [f"{r[0]} ({r[1]})" for r in cur.fetchall()]
+                parts.append(f"Table: {tbl} - {desc}\nColumns: {', '.join(cols)}")
+            except Exception:
+                pass
+        return "\n\n".join(parts) if parts else "Table: iceberg.retail_gold.semantic_sales_mart (sales_year, sales_month, store_id, store_name, net_revenue, gross_revenue, net_profit)"
+    except Exception:
+        return "Table: iceberg.retail_gold.semantic_sales_mart (sales_year, sales_month, store_id, store_name, net_revenue, gross_revenue, net_profit)"
+
+def build_system_prompt() -> str:
+    schema = get_dynamic_schema()
+    return f"""You are an expert Trino SQL Data Analyst for an Apache Iceberg Lakehouse.
 Generate ONLY valid Trino SQL. Think concisely and output the SQL query directly.
 
-Available Schema:
-1. `iceberg.retail_gold.semantic_sales_mart` (Sales Mart):
-   Columns: sales_date (date), sales_year (int), sales_month (int), channel ('store'/'web'), order_id (bigint), product_id, product_name, brand, category, store_id, store_name, store_city, store_state, promo_name, quantity_sold, net_revenue, gross_revenue, net_profit.
-2. `iceberg.retail_gold.customer_gold` (Customer Dim):
-   Columns: customer_id, first_name, last_name, city, county, state, country, email_address, credit_rating.
+Real-time Database Schema (quét trực tiếp từ cơ sở dữ liệu hiện tại):
+{schema}
 
 Rules:
-- Output ONLY the executable SQL query. No explanation, no markdown text outside code.
+- Output ONLY the executable SQL query starting with SELECT. No explanation, no markdown text outside code.
+- STRICT: Use ONLY the exact column names provided in the schema above. Do NOT invent columns that do not exist.
 - Always use full table names: iceberg.retail_gold.semantic_sales_mart or iceberg.retail_gold.customer_gold.
 - Use ROUND(..., 2) for currency/profit.
 - Use COUNT(DISTINCT order_id) for order count.
@@ -132,10 +153,11 @@ def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, mo
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json"
     }
+    sys_prompt = build_system_prompt()
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": sys_prompt},
             {"role": "user", "content": f"""User question: {user_prompt}
 Generate Trino SQL query:"""}
         ],
@@ -154,7 +176,7 @@ def generate_sql_with_gemini(user_prompt: str, key: str, model: str) -> str:
         raise RuntimeError("Thư viện google-generativeai chưa được cài đặt")
     genai.configure(api_key=key)
     m = genai.GenerativeModel(model)
-    full_prompt = f"""{SYSTEM_PROMPT}
+    full_prompt = f"""{build_system_prompt()}
 Question: {user_prompt}
 Trino SQL:"""
     resp = m.generate_content(full_prompt)
