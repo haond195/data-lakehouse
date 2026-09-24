@@ -3,7 +3,30 @@ import re
 import streamlit as st
 import pandas as pd
 import requests
+import altair as alt
 from trino.dbapi import connect
+
+def detect_chart_type(prompt_text: str) -> str:
+    p = prompt_text.lower()
+    if any(k in p for k in ["tròn", "pie", "donut", "bánh", "tỷ lệ", "tỷ trọng", "phần trăm", "cơ cấu"]):
+        return "pie"
+    elif any(k in p for k in ["đường", "line", "xu hướng", "trend", "biến thiên", "thời gian", "theo tháng", "theo năm"]):
+        return "line"
+    return "bar"
+
+def render_chart(df: pd.DataFrame, chart_type: str, col_x: str, col_y: str):
+    if chart_type == "pie":
+        pie = alt.Chart(df).mark_arc(innerRadius=45, outerRadius=120).encode(
+            theta=alt.Theta(field=col_y, type="quantitative"),
+            color=alt.Color(field=col_x, type="nominal", legend=alt.Legend(title=col_x)),
+            tooltip=[col_x, col_y]
+        ).properties(height=360)
+        st.altair_chart(pie, use_container_width=True)
+    elif chart_type == "line":
+        st.line_chart(df.set_index(col_x)[col_y])
+    else:
+        st.bar_chart(df.set_index(col_x)[col_y])
+
 
 try:
     import google.generativeai as genai
@@ -284,8 +307,11 @@ for msg in st.session_state.messages:
         if "df" in msg:
             st.dataframe(msg["df"], use_container_width=True)
         if msg.get("chart"):
-            col_x, col_y = msg["chart"]
-            st.bar_chart(msg["df"].set_index(col_x)[col_y])
+            c_info = msg["chart"]
+            if isinstance(c_info, dict):
+                render_chart(msg["df"], c_info.get("type", "bar"), c_info["cols"][0], c_info["cols"][1])
+            elif isinstance(c_info, (tuple, list)) and len(c_info) == 2:
+                render_chart(msg["df"], "bar", c_info[0], c_info[1])
 
 user_input = st.chat_input("Nhập câu hỏi phân tích bằng tiếng Việt hoặc SQL...")
 prompt = st.session_state.pop("prompt_input", None) or user_input
@@ -326,7 +352,7 @@ if prompt:
 
             st.dataframe(df, use_container_width=True)
 
-            chart_cols = None
+            chart_data = None
             for col in df.columns[1:]:
                 try:
                     df[col] = pd.to_numeric(df[col])
@@ -334,8 +360,10 @@ if prompt:
                     pass
 
             if len(df.columns) >= 2 and pd.api.types.is_numeric_dtype(df[df.columns[1]]):
-                st.bar_chart(df.set_index(df.columns[0])[df.columns[1]])
-                chart_cols = (df.columns[0], df.columns[1])
+                col_x, col_y = df.columns[0], df.columns[1]
+                ctype = detect_chart_type(prompt)
+                render_chart(df, ctype, col_x, col_y)
+                chart_data = {"type": ctype, "cols": (col_x, col_y)}
 
             res_payload = {
                 "role": "assistant",
@@ -343,8 +371,8 @@ if prompt:
                 "sql": sql,
                 "df": df
             }
-            if chart_cols:
-                res_payload["chart"] = chart_cols
+            if chart_data:
+                res_payload["chart"] = chart_data
             st.session_state.messages.append(res_payload)
 
         except Exception as e:
