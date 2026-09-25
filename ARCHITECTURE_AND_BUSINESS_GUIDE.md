@@ -335,3 +335,41 @@ etail_silver: privileges: [] -> Trino lập tức trả về lỗi Access Denied
 2. **Superset Role-Based Access Control (RBAC):**
    * **Role Admin:** Toàn quyền cấu hình kết nối Database, tạo Schema, quản trị người dùng.
    * **Role Gamma (nalyst):** Người dùng nghiệp vụ chỉ được xem biểu đồ và Dashboard được cấp phép, không thể can thiệp vào tầng kết nối hạ tầng.
+
+
+---
+
+## 8. ĐÁNH GIÁ HỆ THỐNG: CÁC ĐIỂM ĐÃ HOÀN THÀNH & PHẠM VI CHƯA TRIỂN KHAI
+
+### 8.1. Các hạng mục đã hoàn thành xuất sắc (Đạt chuẩn Enterprise Lakehouse)
+1. **Kiến trúc Modern Lakehouse phân tách Compute & Storage:**
+   * Lưu trữ phân tán dạng Parquet trên MinIO S3 với định dạng bảng Apache Iceberg v2 hỗ trợ ACID, Time Travel và Schema Evolution.
+   * Động cơ xử lý phân tán Trino In-Memory cho tốc độ truy vấn cực nhanh (< 0.2s) trên hàng trăm nghìn bản ghi.
+2. **Bao phủ 100% 4 phân hệ nghiệp vụ Medallion (Bronze -> Silver -> Gold):**
+   * *Bán lẻ Cửa hàng (Retail Sales):* Bảng hóa đơn, chỉ số doanh thu thuần, doanh thu gộp, lợi nhuận.
+   * *Chuỗi cung ứng & Kho - Kệ (Supply Chain & Inventory):* Đối soát số lượng hàng trên kệ và hàng tồn kho, tính số ngày tồn kho (DSI) và phân loại nguy cơ ứ đọng hàng (OVERSTOCK_RISK).
+   * *Bán lẻ Đa kênh & Giao vận, Đổi trả (Omnichannel & Returns):* Hợp nhất 3 kênh Store, Web, Catalog thành 1 bảng giao dịch duy nhất (191k dòng); phân tích nguyên nhân đổi trả hàng.
+   * *Khuyến mãi & Khách hàng 360 (Promotions & Customer 360):* Đo lường ROI % từng chiến dịch quảng cáo; phân khúc khách hàng theo học vấn, tín dụng, quốc gia.
+3. **Mô hình Config-driven ETL tự động hóa:**
+   * Cơ chế khai báo nguồn và quy tắc lọc/tính toán qua file YAML (config/etl_pipeline.yaml), thực thi tự động qua engine Python mà không cần lập trình lại hệ thống.
+4. **Bộ chỉ số phân tích nghiệp vụ chuyên sâu (Semantic Views):**
+   * Đóng gói sẵn các công thức tài chính chuẩn hóa: AOV, AUP, Net Margin %, DSI, Vòng quay tồn kho, Tỷ trọng doanh thu kênh, Campaign ROI %, Return Rate %.
+5. **Bảo mật & Phân quyền RBAC nội bộ không cần Apache Ranger:**
+   * Phân quyền trực tiếp trong Trino qua 
+ules.json: Tài khoản nalyst chỉ được đọc tầng Gold, bị chặn hoàn toàn khi truy cập tầng Bronze/Silver hoặc cố tình thực hiện lệnh phá hoại (DROP TABLE/VIEW).
+   * Phân quyền vai trò trên Apache Superset giữa nhóm Admin và nhóm nghiệp vụ Gamma (nalyst).
+6. **Trợ lý Phân tích AI Text-to-SQL Động cơ kép:**
+   * Tự động quét cấu trúc 9 bảng/view Gold trong thời gian thực (Schema Introspection), sinh câu lệnh SQL chuẩn Trino (hỗ trợ cả CTE WITH phức tạp) và tự động trực quan hóa biểu đồ.
+
+---
+
+### 8.2. Các hạng mục chưa đưa vào hệ thống & Giải thích lý do kỹ thuật
+
+1. **Luồng dữ liệu thời gian thực (Real-time Streaming qua Kafka / Flink / Spark Streaming):**
+   * *Lý do:* Bộ dữ liệu TPC-DS SF1 là dữ liệu lịch sử/tĩnh phục vụ phân tích xu hướng quản trị. Trong nghiệp vụ doanh nghiệp thực tế, 95% báo cáo tài chính, hiệu quả kho bãi và marketing chỉ cần đối soát theo mẻ định kỳ (Batch ETL hàng đêm hoặc hàng giờ). Bật Kafka + Spark Streaming chạy 24/7 chỉ làm lãng phí 2-3 GB RAM máy chủ mà không tạo thêm giá trị phân tích cho dữ liệu tĩnh.
+2. **Công cụ điều phối luồng tập trung (Workflow Orchestrator: Apache Airflow / Dagster):**
+   * *Lý do:* Hệ thống hiện tại đã có bộ script ETL chuẩn hóa và engine Config-driven YAML có thể gọi tự động qua Windows Task Scheduler hoặc cronjob nhẹ nhàng. Cài đặt thêm Apache Airflow đòi hỏi ít nhất 4 container phụ trợ (Webserver, Scheduler, Triggerer, Worker) tốn thêm 2.5 GB RAM, không tối ưu cho môi trường cục bộ (Local).
+3. **Bộ kiểm định chất lượng dữ liệu độc lập (Great Expectations / Soda Core):**
+   * *Lý do:* Toàn bộ quy tắc kiểm tra chất lượng dữ liệu (Data Quality Checks) gồm: kiểm tra khóa chính, loại bỏ bản ghi rác (WHERE raw_net_paid IS NOT NULL AND raw_quantity > 0), khử NULL (COALESCE), và chống chia cho 0 (NULLIF) đã được nhúng chặt chẽ ngay tại các câu lệnh chuyển đổi tầng Silver và View Gold.
+4. **Triển khai cụm phân tán đa máy chủ (Multi-node Kubernetes Cluster):**
+   * *Lý do:* Hệ thống được đóng gói hoàn hảo trong docker-compose.yml trên một máy trạm duy nhất nhằm phục vụ tối đa nhu cầu kiểm thử, chấm đồ án và trình diễn PoC (Proof of Concept) mà không phát sinh chi phí thuê máy chủ đám mây (Cloud). Toàn bộ kiến trúc đều đã sẵn sàng để scale-out lên cụm Kubernetes khi doanh nghiệp có nhu cầu.

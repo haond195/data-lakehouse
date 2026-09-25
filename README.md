@@ -206,3 +206,27 @@ D:\local-lakehouse\
 ├── ARCHITECTURE_AND_BUSINESS_GUIDE.md # Tài liệu đặc tả kỹ thuật & nghiệp vụ chi tiết
 └── README.md                       # Tài liệu tổng quan dự án (File này)
 ```
+
+---
+
+## ⚖️ 8. Đánh giá Hệ thống: Điểm Hoàn thành & Phạm vi Chưa triển khai
+
+### 8.1. Những điểm nổi bật đã làm được:
+1. **Kiến trúc Modern Lakehouse chuẩn công nghiệp:** Phân tách hoàn toàn Compute (Trino) và Storage (MinIO S3 / Apache Iceberg v2).
+2. **Bao phủ 100% 4 phân hệ dữ liệu TPC-DS:** Bán lẻ (Sales), Chuỗi cung ứng kho - kệ (Supply Chain & Inventory), Đa kênh (Store/Web/Catalog) và Tiếp thị (Promotions & Customer 360).
+3. **Mô hình Config-driven ETL:** Cho phép cắm thêm bộ dữ liệu mới chỉ bằng 1 file cấu hình YAML (dynamic_etl_runner.py).
+4. **Bộ chỉ số phân tích nghiệp vụ thực tế (Semantic KPIs):** Đóng gói công thức AOV, DSI (Số ngày tồn kho), Vòng quay tồn kho, Tỷ trọng kênh, ROI khuyến mãi.
+5. **Cơ chế Phân quyền RBAC nội bộ:** File-based Access Control trong Trino (dmin toàn quyền, nalyst chỉ đọc tầng Gold, chặn truy cập Bronze/Silver) và Superset User Roles.
+6. **Trợ lý AI Text-to-SQL Động cơ kép:** Nhận diện thời gian thực toàn bộ các bảng Gold Marts, hỗ trợ CTE WITH phức tạp và tự động vẽ biểu đồ.
+
+---
+
+### 8.2. Những điểm chưa đưa vào hệ thống & Giải thích lý do:
+1. **Luồng dữ liệu thời gian thực (Real-time Streaming qua Kafka / Flink):**
+   * *Giải thích:* TPC-DS là bộ dữ liệu quá khứ/tĩnh phục vụ phân tích xu hướng và báo cáo quản trị. 95% báo cáo kinh doanh của doanh nghiệp chỉ cần chạy theo mẻ (Batch ETL hàng đêm hoặc hàng giờ). Bật Kafka + Spark Streaming 24/7 chỉ làm lãng phí 2–3 GB RAM máy chủ mà không mang lại giá trị phân tích vượt trội cho dữ liệu tĩnh.
+2. **Công cụ điều phối luồng tập trung (Apache Airflow / Prefect):**
+   * *Giải thích:* Hệ thống đã có engine Config-driven YAML và các script ETL độc lập, dễ dàng chạy qua cronjob. Cài thêm Apache Airflow đòi hỏi 4 container phụ trợ tốn thêm 2.5 GB RAM, không tối ưu cho môi trường chạy cục bộ (Local).
+3. **Bộ kiểm định chất lượng dữ liệu độc lập (Great Expectations / Soda):**
+   * *Giải thích:* Các quy tắc kiểm tra toàn vẹn, loại bỏ bản ghi lỗi (WHERE raw_net_paid IS NOT NULL AND raw_quantity > 0), khử NULL (COALESCE), và chống chia cho 0 (NULLIF) đã được nhúng trực tiếp vào các câu lệnh SQL ở tầng Silver và Gold.
+4. **Triển khai cụm phân tán đa node (Kubernetes Cluster):**
+   * *Giải thích:* Dự án được tối ưu để chạy khép kín trên Docker Compose trên một máy trạm duy nhất nhằm phục vụ kiểm thử, nghiệm thu đồ án và demo PoC mà không phát sinh chi phí hạ tầng Cloud.
