@@ -1,0 +1,44 @@
+pipeline_name: "supply_chain_inventory_pipeline"
+version: "1.0"
+
+# 1. Nguồn dữ liệu (Source)
+source:
+  catalog: "tpcds"
+  schema: "sf1"
+  table: "inventory"
+  limit: 150000
+
+# 2. Tầng Bronze (Raw Data)
+bronze:
+  catalog: "iceberg"
+  schema: "retail_bronze"
+  table: "inventory_raw"
+  columns:
+    - {source: "inv_date_sk", target: "date_id"}
+    - {source: "inv_item_sk", target: "item_id"}
+    - {source: "inv_warehouse_sk", target: "warehouse_id"}
+    - {source: "inv_quantity_on_hand", target: "raw_qty_on_hand"}
+
+# 3. Tầng Silver (Cleaned & Standardized)
+silver:
+  catalog: "iceberg"
+  schema: "retail_silver"
+  table: "clean_inventory"
+  filters:
+    - "raw_qty_on_hand >= 0"
+  transformations:
+    - {target: "date_id", expr: "date_id"}
+    - {target: "item_id", expr: "item_id"}
+    - {target: "warehouse_id", expr: "warehouse_id"}
+    - {target: "qty_on_hand", expr: "COALESCE(raw_qty_on_hand, 0)"}
+
+# 4. Tầng Gold (Business KPI Mart)
+gold:
+  catalog: "iceberg"
+  schema: "retail_gold"
+  table: "gold_inventory_by_warehouse"
+  group_by:
+    - "warehouse_id"
+  metrics:
+    - {target: "total_stocked_units", expr: "SUM(qty_on_hand)"}
+    - {target: "distinct_items_count", expr: "COUNT(DISTINCT item_id)"}

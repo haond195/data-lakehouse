@@ -114,7 +114,9 @@ def get_dynamic_schema() -> str:
         tables = [
             ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
             ("iceberg.retail_gold.mart_monthly_store_performance", "Store Performance (Hiệu suất cửa hàng theo tháng)"),
-            ("iceberg.retail_gold.customer_gold", "Customer Dimension (Khách hàng)")
+            ("iceberg.retail_gold.customer_gold", "Customer Dimension (Khách hàng)"),
+            ("iceberg.retail_gold.mart_inventory_turnover", "Inventory vs Shelf Turnover (Đối soát hàng trong kho và hàng bán trên kệ theo tháng)"),
+            ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Performance (Hiệu suất diện tích và mật độ tồn kho từng kho)")
         ]
         parts = []
         for tbl, desc in tables:

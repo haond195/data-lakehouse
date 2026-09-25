@@ -126,10 +126,23 @@ Dữ liệu được xử lý qua 3 tầng chuẩn công nghiệp **Medallion Ar
    * Tránh lỗi chia cho 0 bằng `NULLIF`: `ROUND((SUM(net_profit) / NULLIF(SUM(net_revenue), 0)) * 100, 2) AS profit_margin_pct`.
    * Gắn nhãn thời gian truy vết ở từng tầng: `_ingested_at` (Bronze), `_transformed_at` (Silver), `_calculated_at` (Gold).
 
-### 3.2. Chi tiết phân tầng dữ liệu
-* **Tầng Bronze (`iceberg.retail_bronze.store_sales_raw` - 100.000 dòng):** Tiếp nhận dữ liệu nguồn thô, lưu trữ dạng Parquet trên S3.
-* **Tầng Silver (`iceberg.retail_silver.sales_transactions` - 92.276 dòng):** Dữ liệu chuẩn hóa, khử NULL, ép kiểu `DOUBLE` và định dạng ngày tháng.
-* **Tầng Gold (`iceberg.retail_gold.mart_monthly_store_performance` - 4.133 dòng):** Gom nhóm tính sẵn doanh thu, lợi nhuận theo Tháng/Cửa hàng/Ngành hàng, phản hồi trong **0,18s**.
+### 3.2. Chi tiết phân tầng dữ liệu Medallion hoàn chỉnh
+
+#### A. Phân hệ Bán lẻ & Doanh thu (Retail Sales Domain):
+* **🥉 Tầng Bronze (`retail_bronze.store_sales_raw` - 100.000 dòng):** Tiếp nhận dữ liệu giao dịch bán lẻ thô.
+* **🥈 Tầng Silver (`retail_silver.sales_transactions` - 92.276 dòng):** Làm sạch đơn hàng lỗi, chuẩn hóa kiểu `DOUBLE`, liên kết Dimension.
+* **🥇 Tầng Gold (`retail_gold.mart_monthly_store_performance` - 4.133 dòng):** Gom nhóm tính sẵn doanh thu, chi phí, lợi nhuận theo Tháng/Cửa hàng.
+
+#### B. Phân hệ Chuỗi cung ứng & Kho - Kệ (Supply Chain & Inventory Domain):
+* **🥉 Tầng Bronze:**
+  * `retail_bronze.warehouse_raw` (5 dòng): Thông tin thô các kho hàng.
+  * `retail_bronze.inventory_raw` (150.000 dòng): Dữ liệu kiểm kê số lượng tồn kho nguyên bản.
+* **🥈 Tầng Silver:**
+  * `retail_silver.dim_warehouse` (5 dòng): Danh mục kho chuẩn hóa diện tích và vị trí.
+  * `retail_silver.inventory_snapshot` (142.546 dòng): Tồn kho làm sạch, liên kết chi tiết tên sản phẩm, thương hiệu, đơn giá và giá trị tồn kho.
+* **🥇 Tầng Gold:**
+  * `retail_gold.mart_inventory_turnover` (667 dòng): Đối soát hàng bán trên kệ (`sales_transactions`) với hàng tồn kho (`inventory_snapshot`), tính tỷ lệ quay vòng kho - kệ (`shelf_to_warehouse_ratio`).
+  * `retail_gold.mart_warehouse_utilization` (5 dòng): Đo lường mật độ lưu trữ (`density_units_per_sq_ft`) và tổng giá trị hàng hóa tại từng kho.
 
 ### 3.3. Tự động hóa với mô hình Config-driven ETL
 Hệ thống hỗ trợ cơ chế nạp dữ liệu không cần viết lại mã nguồn Python:
