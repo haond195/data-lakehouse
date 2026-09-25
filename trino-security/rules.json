@@ -1,0 +1,71 @@
+{
+  "catalogs": [
+    {
+      "user": "admin",
+      "allow": "all"
+    },
+    {
+      "user": "etl_.*|ai_.*",
+      "allow": "all"
+    },
+    {
+      "user": "analyst",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "user": ".*",
+      "allow": "all"
+    }
+  ],
+  "schemas": [
+    {
+      "user": "admin",
+      "owner": true
+    },
+    {
+      "user": "etl_.*|ai_.*",
+      "owner": true
+    },
+    {
+      "user": "analyst",
+      "schema": "retail_gold",
+      "owner": false
+    },
+    {
+      "user": "analyst",
+      "schema": ".*",
+      "owner": false
+    },
+    {
+      "user": ".*",
+      "owner": true
+    }
+  ],
+  "tables": [
+    {
+      "user": "admin",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP", "GRANT_SELECT"]
+    },
+    {
+      "user": "etl_.*|ai_.*",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP", "GRANT_SELECT"]
+    },
+    {
+      "user": "analyst",
+      "catalog": "iceberg",
+      "schema": "retail_gold",
+      "privileges": ["SELECT"]
+    },
+    {
+      "user": "analyst",
+      "catalog": "iceberg",
+      "schema": "retail_(bronze|silver)",
+      "privileges": []
+    },
+    {
+      "user": ".*",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP"]
+    }
+  ]
+}

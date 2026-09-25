@@ -280,13 +280,16 @@ Hệ thống AI Chatbot hoạt động theo cơ chế **Dual Engine (Động cơ
 
 ### 6.1. Danh mục Cổng truy cập & Tài khoản
 
-| Ứng dụng | Địa chỉ Web (URL) | Tài khoản / Thông tin | Chức năng |
+| Ứng dụng | Địa chỉ Web (URL) | Tài khoản / Mật khẩu | Quyền hạn & Vai trò |
 | :--- | :--- | :--- | :--- |
-| **Apache Superset** | `http://localhost:8089` | `admin` / `admin` | Dashboard BI & SQL Lab |
-| **AI Chatbot** | `http://localhost:8501` | Trực tiếp không cần mật khẩu | Hỏi đáp Text-to-SQL |
-| **Trino Web UI** | `http://localhost:8080` | User: `admin` | Theo dõi truy vấn & hiệu năng cụm |
-| **MinIO Console** | `http://localhost:9001` | `admin` / `password123` | Quản lý S3 Object Storage |
-| **PostgreSQL** | `localhost:5433` | User: `postgres`, DB: `metastore` | Lưu trữ siêu dữ liệu Catalog |
+| **Apache Superset** | http://localhost:8089 | dmin / dmin | **Admin:** Toàn quyền quản trị hệ thống |
+| **Apache Superset** | http://localhost:8089 | nalyst / nalyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
+| **Trino CLI / JDBC** | localhost:8080 | User: dmin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
+| **Trino CLI / JDBC** | localhost:8080 | User: nalyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
+| **AI Chatbot** | http://localhost:8501 | Mở trực tiếp | Hỏi đáp tự động với các Gold Marts |
+| **Trino Web UI** | http://localhost:8080 | User: dmin | Theo dõi truy vấn & hiệu năng cụm |
+| **MinIO Console** | http://localhost:9001 | dmin / password123 | Quản trị S3 Object Storage |
+| **PostgreSQL** | localhost:5433 | User: postgres, DB: metastore | Lưu trữ siêu dữ liệu Catalog |
 
 ### 6.2. Các lệnh vận hành thường dùng (CLI PowerShell)
 
@@ -311,3 +314,24 @@ Hệ thống AI Chatbot hoạt động theo cơ chế **Dual Engine (Động cơ
    ```powershell
    docker compose down
    ```
+
+---
+
+## 7. BẢO MẬT & PHÂN QUYỀN TRUY CẬP (SECURITY & ACCESS CONTROL)
+
+Hệ thống triển khai cơ chế phân quyền RBAC độc lập, hiệu năng cao mà **không cần phụ thuộc vào Apache Ranger**:
+
+1. **Trino File-based Access Control (	rino-security/rules.json):**
+   * Được cấu hình qua ccess-control.properties với cơ chế kiểm soát trực tiếp trong nhân Trino (tốn 0 MB RAM phụ trợ).
+   * **Tài khoản nalyst:**
+     * Quyền trên 
+etail_gold: Chỉ được phép SELECT.
+     * Quyền trên 
+etail_bronze & 
+etail_silver: privileges: [] -> Trino lập tức trả về lỗi Access Denied: Cannot select from table... nếu cố tình truy vấn dữ liệu thô.
+     * Quyền DDL: Bị tước bỏ quyền DROP TABLE, DROP VIEW, ALTER để bảo vệ toàn vẹn dữ liệu.
+   * **Tài khoản dmin & etl_*:** Có đầy đủ quyền DDL/DML phục vụ quá trình pipeline và quản trị hệ thống.
+
+2. **Superset Role-Based Access Control (RBAC):**
+   * **Role Admin:** Toàn quyền cấu hình kết nối Database, tạo Schema, quản trị người dùng.
+   * **Role Gamma (nalyst):** Người dùng nghiệp vụ chỉ được xem biểu đồ và Dashboard được cấp phép, không thể can thiệp vào tầng kết nối hạ tầng.

@@ -166,13 +166,16 @@ python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
 
 ### 6.3. Bảng điều khiển dịch vụ & Thông tin đăng nhập
 
-| Dịch vụ | Địa chỉ Web (URL) | Tài khoản / Thông tin | Ghi chú |
+| Dịch vụ / Công cụ | Địa chỉ Web (URL) | Tài khoản / Mật khẩu | Quyền hạn & Vai trò |
 | :--- | :--- | :--- | :--- |
-| **Apache Superset** | `http://localhost:8089` | `admin` / `admin` | Đã liên kết sẵn Trino & Data Marts |
-| **AI Data Assistant** | `http://localhost:8501` | Mở trực tiếp hoặc icon `🤖` trên Superset | Text-to-SQL + Auto Chart |
-| **Trino Web UI** | `http://localhost:8080` | Username: `admin` | Giám sát query phân tán |
-| **MinIO Console** | `http://localhost:9001` | `admin` / `password123` | Quản trị S3 Bucket `warehouse` |
-| **PostgreSQL Catalog**| `localhost:5433` | User: `postgres` \| DB: `metastore` | Siêu dữ liệu Iceberg JDBC |
+| **Apache Superset** | http://localhost:8089 | dmin / dmin | **Admin:** Toàn quyền quản trị hệ thống |
+| **Apache Superset** | http://localhost:8089 | nalyst / nalyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
+| **Trino CLI / JDBC** | localhost:8080 | User: dmin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
+| **Trino CLI / JDBC** | localhost:8080 | User: nalyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
+| **AI Data Assistant** | http://localhost:8501 | Mở trực tiếp hoặc icon 🤖 trên Superset | Text-to-SQL + Auto Chart |
+| **Trino Web UI** | http://localhost:8080 | Username: dmin | Giám sát query phân tán |
+| **MinIO Console** | http://localhost:9001 | dmin / password123 | Quản trị S3 Bucket warehouse |
+| **PostgreSQL Catalog**| localhost:5433 | User: postgres | DB: metastore | Siêu dữ liệu Iceberg JDBC |
 
 ---
 
