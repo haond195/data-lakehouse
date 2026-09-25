@@ -168,13 +168,13 @@ python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
 
 | Dịch vụ / Công cụ | Địa chỉ Web (URL) | Tài khoản / Mật khẩu | Quyền hạn & Vai trò |
 | :--- | :--- | :--- | :--- |
-| **Apache Superset** | http://localhost:8089 | dmin / dmin | **Admin:** Toàn quyền quản trị hệ thống |
-| **Apache Superset** | http://localhost:8089 | nalyst / nalyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
-| **Trino CLI / JDBC** | localhost:8080 | User: dmin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
-| **Trino CLI / JDBC** | localhost:8080 | User: nalyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
+| **Apache Superset** | http://localhost:8089 | admin / admin | **Admin:** Toàn quyền quản trị hệ thống |
+| **Apache Superset** | http://localhost:8089 | analyst / analyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
+| **Trino CLI / JDBC** | localhost:8080 | User: admin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
+| **Trino CLI / JDBC** | localhost:8080 | User: analyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
 | **AI Data Assistant** | http://localhost:8501 | Mở trực tiếp hoặc icon 🤖 trên Superset | Text-to-SQL + Auto Chart |
-| **Trino Web UI** | http://localhost:8080 | Username: dmin | Giám sát query phân tán |
-| **MinIO Console** | http://localhost:9001 | dmin / password123 | Quản trị S3 Bucket warehouse |
+| **Trino Web UI** | http://localhost:8080 | Username: admin | Giám sát query phân tán |
+| **MinIO Console** | http://localhost:9001 | admin / password123 | Quản trị S3 Bucket warehouse |
 | **PostgreSQL Catalog**| localhost:5433 | User: postgres | DB: metastore | Siêu dữ liệu Iceberg JDBC |
 
 ---
@@ -216,7 +216,7 @@ D:\local-lakehouse\
 2. **Bao phủ 100% 4 phân hệ dữ liệu TPC-DS:** Bán lẻ (Sales), Chuỗi cung ứng kho - kệ (Supply Chain & Inventory), Đa kênh (Store/Web/Catalog) và Tiếp thị (Promotions & Customer 360).
 3. **Mô hình Config-driven ETL:** Cho phép cắm thêm bộ dữ liệu mới chỉ bằng 1 file cấu hình YAML (dynamic_etl_runner.py).
 4. **Bộ chỉ số phân tích nghiệp vụ thực tế (Semantic KPIs):** Đóng gói công thức AOV, DSI (Số ngày tồn kho), Vòng quay tồn kho, Tỷ trọng kênh, ROI khuyến mãi.
-5. **Cơ chế Phân quyền RBAC nội bộ:** File-based Access Control trong Trino (dmin toàn quyền, nalyst chỉ đọc tầng Gold, chặn truy cập Bronze/Silver) và Superset User Roles.
+5. **Cơ chế Phân quyền RBAC nội bộ:** File-based Access Control trong Trino (admin toàn quyền, analyst chỉ đọc tầng Gold, chặn truy cập Bronze/Silver) và Superset User Roles.
 6. **Trợ lý AI Text-to-SQL Động cơ kép:** Nhận diện thời gian thực toàn bộ các bảng Gold Marts, hỗ trợ CTE WITH phức tạp và tự động vẽ biểu đồ.
 
 ---
