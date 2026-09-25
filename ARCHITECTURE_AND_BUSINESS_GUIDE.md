@@ -25,22 +25,40 @@ Hệ thống giải quyết bài toán quản trị và phân tích dữ liệu 
 * **Rút ngắn thời gian ra quyết định:** Chuyển đổi từ mô hình báo cáo truyền thống (mất vài ngày viết SQL/Excel) sang **Hỏi - Đáp ngôn ngữ tự nhiên tức thì (AI Data Assistant)** và **Dashboard trực quan tự phục vụ (Self-service BI)**.
 * **Chuẩn hóa công thức chỉ số:** Loại bỏ tình trạng mỗi phòng ban tính một kiểu; mọi chỉ số (Doanh thu, Chi phí, Lợi nhuận) đều được khóa cứng tại lớp ngữ nghĩa (**Semantic Layer**).
 
-### 1.2. Định nghĩa các chỉ số đo lường cốt lõi (Business Metrics / KPIs)
-1. **Doanh thu thuần (Net Revenue):**
-   $$\text{Net Revenue} = \sum (\text{ss\_net\_paid})$$
-   *Ý nghĩa:* Số tiền thực tế doanh nghiệp thu về từ khách hàng sau khi đã trừ toàn bộ mã giảm giá, chiết khấu và khuyến mãi.
-2. **Doanh thu gộp (Gross Revenue):**
-   $$\text{Gross Revenue} = \sum (\text{ss\_list\_price} \times \text{ss\_quantity})$$
-   *Ý nghĩa:* Giá trị đơn hàng tính theo giá niêm yết ban đầu trước khi áp dụng chính sách giảm giá.
-3. **Lợi nhuận thuần (Net Profit):**
-   $$\text{Net Profit} = \sum (\text{ss\_net\_profit})$$
-   *Ý nghĩa:* Lợi nhuận còn lại sau khi trừ giá vốn hàng bán (COGS) và chi phí bán hàng trực tiếp.
-4. **Tỷ suất lợi nhuận (Profit Margin %):**
+### 1.2. Định nghĩa Bộ chỉ số đo lường cốt lõi theo từng Nghiệp vụ (Business KPIs)
+
+#### A. Nghiệp vụ Bán lẻ & Cửa hàng (Retail Sales):
+1. **Giá trị trung bình đơn hàng (Average Order Value - AOV):**
+   $$\text{AOV} = \frac{\text{Net Revenue}}{\text{Total Orders}}$$
+2. **Biên lợi nhuận thuần (Net Profit Margin %):**
    $$\text{Profit Margin (\%)} = \left( \frac{\text{Net Profit}}{\text{Net Revenue}} \right) \times 100$$
-   *Ý nghĩa:* Đánh giá hiệu quả sinh lời của từng chi nhánh, danh mục sản phẩm hoặc chiến dịch.
-5. **Tổng số đơn hàng thành công (Total Orders):**
-   $$\text{Total Orders} = \text{COUNT}(\text{DISTINCT } \text{order\_id})$$
-   *Ý nghĩa:* Đo lường lượng giao dịch thực tế phát sinh (loại trừ trùng lặp mã đơn).
+3. **Đơn giá bán trung bình (Average Unit Price - AUP):**
+   $$\text{AUP} = \frac{\text{Net Revenue}}{\text{Units Sold}}$$
+
+#### B. Nghiệp vụ Chuỗi cung ứng & Kho - Kệ (Supply Chain & Inventory):
+1. **Vòng quay tồn kho kho - kệ (Inventory Turnover Ratio):**
+   $$\text{Turnover Ratio} = \frac{\text{Units Sold on Shelf}}{\text{Total Warehouse Stock}}$$
+2. **Số ngày bán hết tồn kho (Days Sales of Inventory - DSI):**
+   $$\text{DSI} = \left( \frac{\text{Total Warehouse Stock}}{\text{Units Sold on Shelf}} \right) \times 30$$
+   *Ý nghĩa:* Dự báo số ngày tồn kho còn lại; phát hiện rủi ro tồn ứ (`OVERSTOCK_RISK`) hoặc cháy hàng (`OUT_OF_STOCK`).
+3. **Mật độ hàng hóa lưu kho (Storage Density):**
+   $$\text{Density} = \frac{\text{Total Units Stored}}{\text{Warehouse Area (Sq Ft)}}$$
+
+#### C. Nghiệp vụ Bán lẻ Đa kênh & Giao vận (Omnichannel & Returns):
+1. **Tỷ trọng doanh thu theo kênh (Channel Revenue Share %):**
+   $$\text{Channel Share (\%)} = \left( \frac{\text{Channel Revenue}}{\sum \text{Omnichannel Revenue}} \right) \times 100$$
+2. **Tỷ lệ đổi trả hàng (Return Rate %):**
+   $$\text{Return Rate (\%)} = \left( \frac{\text{Returned Units}}{\text{Units Sold}} \right) \times 100$$
+3. **Tỷ lệ hoàn tiền trên doanh thu (Refund Impact Ratio %):**
+   $$\text{Refund Impact (\%)} = \left( \frac{\text{Total Refunded Amount}}{\text{Net Revenue}} \right) \times 100$$
+
+#### D. Nghiệp vụ Khuyến mãi & Khách hàng (Promotions & Marketing ROI):
+1. **Hiệu suất sinh lời chiến dịch (Promotion ROI %):**
+   $$\text{Promotion ROI (\%)} = \left( \frac{\text{Promotion Revenue} - \text{Promo Cost}}{\text{Promo Cost}} \right) \times 100$$
+2. **AOV đơn hàng khuyến mãi (Promo AOV):**
+   $$\text{Promo AOV} = \frac{\text{Promotion Revenue}}{\text{Promo Orders Count}}$$
+3. **Phân bố quy mô khách hàng theo phân khúc (Segment Customer Density):**
+   $$\text{Segment Count} = \text{COUNT}(\text{DISTINCT } \text{customer\_id}) \quad \text{theo Quốc gia, Học vấn, Hạng tín dụng}$$
 
 ### 1.3. Chiều phân tích đa chiều (Dimensions)
 * **Thời gian (Time):** Năm (`sales_year`), Tháng (`sales_month`), Ngày (`sales_date`), Ngày cuối tuần (`is_weekend`), Ngày lễ (`is_holiday`).

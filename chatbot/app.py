@@ -113,13 +113,11 @@ def get_dynamic_schema() -> str:
         cur = conn.cursor()
         tables = [
             ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
-            ("iceberg.retail_gold.mart_monthly_store_performance", "Store Performance (Hiệu suất cửa hàng theo tháng)"),
-            ("iceberg.retail_gold.customer_gold", "Customer Dimension (Khách hàng)"),
-            ("iceberg.retail_gold.mart_inventory_turnover", "Inventory vs Shelf Turnover (Đối soát hàng trong kho và hàng bán trên kệ theo tháng)"),
-            ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Performance (Hiệu suất diện tích và mật độ tồn kho từng kho)"),
-            ("iceberg.retail_gold.mart_promotion_sales_performance", "Promotion Performance (Hiệu quả doanh số từ các chương trình khuyến mãi và chiến dịch email/TV)"),
+            ("iceberg.retail_gold.v_retail_sales_kpis", "Retail Sales KPIs (AOV - Giá trị trung bình đơn hàng, Đơn giá trung bình)"),
+            ("iceberg.retail_gold.v_supplychain_kpis", "Supply Chain KPIs (DSI - Số ngày tồn kho, Vòng quay tồn kho, Tình trạng kho: FAST_MOVING, HEALTHY, OVERSTOCK_RISK)"),
+            ("iceberg.retail_gold.v_omnichannel_kpis", "Omnichannel KPIs (Tỷ trọng doanh thu từng kênh Store/Web/Catalog, Biên lợi nhuận)"),
+            ("iceberg.retail_gold.v_promotion_roi_kpis", "Promotion ROI KPIs (Tỷ suất sinh lời chiến dịch quảng cáo ROI %, AOV theo khuyến mãi)"),
             ("iceberg.retail_gold.mart_customer_segmentation", "Customer Segmentation (Phân khúc khách hàng 360 độ theo quốc gia, giới tính, học vấn, tín dụng)"),
-            ("iceberg.retail_gold.mart_omnichannel_performance", "Omnichannel Performance (Đối soát so sánh doanh thu giữa 3 kênh: Store, Web và Catalog)"),
             ("iceberg.retail_gold.mart_returns_analysis", "Returns Analysis (Phân tích lý do hoàn trả hàng và tổng số tiền hoàn lại)")
         ]
         parts = []
