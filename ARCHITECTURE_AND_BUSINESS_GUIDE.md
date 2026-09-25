@@ -156,6 +156,20 @@ Dữ liệu được xử lý qua 3 tầng chuẩn công nghiệp **Medallion Ar
   * `retail_gold.mart_promotion_sales_performance` (300 dòng): Đánh giá doanh thu và lợi nhuận tạo ra từ từng chương trình khuyến mãi.
   * `retail_gold.mart_customer_segmentation` (12.079 dòng): Phân khúc khách hàng đa chiều theo Quốc gia, Giới tính, Học vấn và Xếp hạng tín dụng.
 
+#### D. Phân hệ Bán lẻ Đa kênh & Giao vận, Đổi trả (Omnichannel & Returns Domain):
+* **🥉 Tầng Bronze:**
+  * `retail_bronze.web_sales_raw` (50.000 dòng): Dữ liệu đơn hàng kênh Web trực tuyến.
+  * `retail_bronze.catalog_sales_raw` (50.000 dòng): Dữ liệu đơn hàng qua Catalog ấn phẩm.
+  * `retail_bronze.store_returns_raw` (25.000 dòng): Dữ liệu đổi trả hàng nguyên bản.
+  * `retail_bronze.ship_mode_raw` (20 dòng): Danh mục phương thức vận chuyển.
+  * `retail_bronze.return_reason_raw` (75 dòng): Danh mục lý do đổi trả hàng.
+* **🥈 Tầng Silver:**
+  * `retail_silver.omnichannel_sales_transactions` (191.790 dòng): Hợp nhất 3 kênh Store, Web, Catalog thành 1 bảng giao dịch đa kênh chuẩn hóa duy nhất.
+  * `retail_silver.returns_transactions` (24.138 dòng): Làm sạch giao dịch trả hàng, liên kết lý do hoàn trả và tiền hoàn lại.
+* **🥇 Tầng Gold:**
+  * `retail_gold.mart_omnichannel_performance` (126 dòng): Đối soát so sánh doanh thu, đơn hàng, giá trị trung bình đơn (AOV) giữa 3 kênh Store vs Web vs Catalog theo Tháng/Năm.
+  * `retail_gold.mart_returns_analysis` (76 dòng): Phân tích chi tiết số lượng hàng trả và tổng tiền hoàn theo từng lý do trả hàng.
+
 ### 3.3. Tự động hóa với mô hình Config-driven ETL
 Hệ thống hỗ trợ cơ chế nạp dữ liệu không cần viết lại mã nguồn Python:
 * **File cấu hình YAML ([config/etl_pipeline.yaml](file:///D:/local-lakehouse/config/etl_pipeline.yaml)):** Khai báo nguồn dữ liệu, danh sách cột mapping tầng Bronze, điều kiện lọc tầng Silver, và các chỉ số tổng hợp tầng Gold.

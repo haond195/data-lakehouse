@@ -118,7 +118,9 @@ def get_dynamic_schema() -> str:
             ("iceberg.retail_gold.mart_inventory_turnover", "Inventory vs Shelf Turnover (Đối soát hàng trong kho và hàng bán trên kệ theo tháng)"),
             ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Performance (Hiệu suất diện tích và mật độ tồn kho từng kho)"),
             ("iceberg.retail_gold.mart_promotion_sales_performance", "Promotion Performance (Hiệu quả doanh số từ các chương trình khuyến mãi và chiến dịch email/TV)"),
-            ("iceberg.retail_gold.mart_customer_segmentation", "Customer Segmentation (Phân khúc khách hàng 360 độ theo quốc gia, giới tính, học vấn, tín dụng)")
+            ("iceberg.retail_gold.mart_customer_segmentation", "Customer Segmentation (Phân khúc khách hàng 360 độ theo quốc gia, giới tính, học vấn, tín dụng)"),
+            ("iceberg.retail_gold.mart_omnichannel_performance", "Omnichannel Performance (Đối soát so sánh doanh thu giữa 3 kênh: Store, Web và Catalog)"),
+            ("iceberg.retail_gold.mart_returns_analysis", "Returns Analysis (Phân tích lý do hoàn trả hàng và tổng số tiền hoàn lại)")
         ]
         parts = []
         for tbl, desc in tables:
