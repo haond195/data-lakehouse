@@ -114,7 +114,8 @@ def get_dynamic_schema() -> str:
         tables = [
             ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
             ("iceberg.retail_gold.v_retail_sales_kpis", "Retail Sales KPIs (AOV - Giá trị trung bình đơn hàng, Đơn giá trung bình)"),
-            ("iceberg.retail_gold.v_supplychain_kpis", "Supply Chain KPIs (DSI - Số ngày tồn kho, Vòng quay tồn kho, Tình trạng kho: FAST_MOVING, HEALTHY, OVERSTOCK_RISK)"),
+            ("iceberg.retail_gold.v_supplychain_kpis", "Supply Chain KPIs (Hàng tồn kho theo ngành hàng, DSI - Số ngày tồn kho, Vòng quay tồn kho, Tình trạng kho: FAST_MOVING, HEALTHY, OVERSTOCK_RISK)"),
+            ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Inventory (Tổng số lượng hàng tồn kho theo từng kho hàng: total_units_stored, total_stored_value, mật độ lưu kho)"),
             ("iceberg.retail_gold.v_omnichannel_kpis", "Omnichannel KPIs (Tỷ trọng doanh thu từng kênh Store/Web/Catalog, Biên lợi nhuận)"),
             ("iceberg.retail_gold.v_promotion_roi_kpis", "Promotion ROI KPIs (Tỷ suất sinh lời chiến dịch quảng cáo ROI %, AOV theo khuyến mãi)"),
             ("iceberg.retail_gold.mart_customer_segmentation", "Customer Segmentation (Phân khúc khách hàng 360 độ theo quốc gia, giới tính, học vấn, tín dụng)"),
