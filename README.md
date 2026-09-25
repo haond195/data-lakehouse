@@ -146,7 +146,13 @@ python -X utf8 D:\local-lakehouse\scripts\etl_tpcds_sf1.py
 ```
 *Kết quả:* Nạp và biến đổi thành công **100.000 dòng Bronze** ➔ **92.276 dòng Silver** ➔ **4.133 dòng Gold KPIs** trong **5,01 giây**.
 
-### 6.3. Bảng điều khiển dịch vụ & Thông tin đăng nhập
+### 6.3. Chạy Config-driven ETL (Tự động hóa với YAML)
+```powershell
+python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
+```
+*Ưu điểm:* Khi có dữ liệu mới, chỉ cần tạo file YAML mô tả cột và quy tắc chuyển đổi mà không cần sửa code Python.
+
+### 6.4. Bảng điều khiển dịch vụ & Thông tin đăng nhập
 
 | Dịch vụ | Địa chỉ Web (URL) | Tài khoản / Thông tin | Ghi chú |
 | :--- | :--- | :--- | :--- |
@@ -162,9 +168,12 @@ python -X utf8 D:\local-lakehouse\scripts\etl_tpcds_sf1.py
 
 ```text
 D:\local-lakehouse\
+├── config\
+│   └── etl_pipeline.yaml           # Cấu hình mẫu cho Config-driven ETL
 ├── chatbot\
 │   └── app.py                      # Ứng dụng Streamlit Text-to-SQL tích hợp DeepSeek & Gemini
 ├── scripts\
+│   ├── dynamic_etl_runner.py       # Engine thực thi ETL động từ file YAML
 │   ├── etl_tpcds_sf1.py            # Pipeline ETL toàn trình chuẩn Medallion từ TPC-DS SF1
 │   └── run_etl.py                  # Script ETL mẫu cho môi trường cục bộ
 ├── trino-catalog\

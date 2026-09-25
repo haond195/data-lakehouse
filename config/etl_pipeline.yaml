@@ -1,0 +1,53 @@
+pipeline_name: "retail_sales_pipeline"
+version: "1.0"
+
+# 1. Nguồn dữ liệu (Source)
+source:
+  catalog: "tpcds"
+  schema: "sf1"
+  table: "store_sales"
+  limit: 20000
+
+# 2. Tầng Bronze (Raw Data)
+bronze:
+  catalog: "iceberg"
+  schema: "retail_bronze"
+  table: "dynamic_bronze_sales"
+  columns:
+    - {source: "ss_ticket_number", target: "order_id"}
+    - {source: "ss_item_sk", target: "item_id"}
+    - {source: "ss_customer_sk", target: "customer_id"}
+    - {source: "ss_store_sk", target: "store_id"}
+    - {source: "ss_quantity", target: "raw_quantity"}
+    - {source: "ss_net_paid", target: "raw_net_paid"}
+    - {source: "ss_net_profit", target: "raw_net_profit"}
+
+# 3. Tầng Silver (Cleaned & Standardized)
+silver:
+  catalog: "iceberg"
+  schema: "retail_silver"
+  table: "dynamic_silver_sales"
+  filters:
+    - "raw_quantity > 0"
+    - "raw_net_paid IS NOT NULL"
+  transformations:
+    - {target: "order_id", expr: "order_id"}
+    - {target: "item_id", expr: "item_id"}
+    - {target: "customer_id", expr: "COALESCE(customer_id, 0)"}
+    - {target: "store_id", expr: "COALESCE(store_id, 0)"}
+    - {target: "quantity", expr: "COALESCE(raw_quantity, 1)"}
+    - {target: "net_revenue", expr: "CAST(COALESCE(raw_net_paid, 0.0) AS DOUBLE)"}
+    - {target: "net_profit", expr: "CAST(COALESCE(raw_net_profit, 0.0) AS DOUBLE)"}
+
+# 4. Tầng Gold (Business KPI Mart)
+gold:
+  catalog: "iceberg"
+  schema: "retail_gold"
+  table: "dynamic_gold_store_summary"
+  group_by:
+    - "store_id"
+  metrics:
+    - {target: "total_orders", expr: "COUNT(DISTINCT order_id)"}
+    - {target: "total_units_sold", expr: "SUM(quantity)"}
+    - {target: "total_revenue", expr: "ROUND(SUM(net_revenue), 2)"}
+    - {target: "total_profit", expr: "ROUND(SUM(net_profit), 2)"}

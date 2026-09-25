@@ -150,18 +150,18 @@ def clean_generated_sql(raw_text: str) -> str:
     if not raw_text:
         return ""
     # 1. Tìm khối ```sql ... ```
-    match_code = re.search(r"```(?:sql)?\s*(SELECT[\s\S]*?)\s*```", raw_text, flags=re.IGNORECASE)
+    match_code = re.search(r"```(?:sql)?\s*([\s\S]*?)\s*```", raw_text, flags=re.IGNORECASE)
     if match_code:
         sql = match_code.group(1).strip()
     else:
-        # 2. Tìm khối bắt đầu bằng SELECT
-        match_select = re.search(r"(SELECT[\s\S]+)", raw_text, flags=re.IGNORECASE)
-        if match_select:
-            sql = match_select.group(1).strip()
+        # 2. Tìm khối bắt đầu bằng WITH hoặc SELECT
+        match_query = re.search(r"((?:WITH|SELECT)[\s\S]+)", raw_text, flags=re.IGNORECASE)
+        if match_query:
+            sql = match_query.group(1).strip()
         else:
             sql = raw_text.strip()
     
-    # 3. Làm sạch ký tự thừa và dấu chấm phẩy cuối dòng (Trino không cho phép ;)
+    # 3. Làm sạch ký tự thừa và dấu chấm phẩy cuối dòng
     sql = re.sub(r"^```(sql)?\s*", "", sql, flags=re.IGNORECASE)
     sql = re.sub(r"\s*```$", "", sql)
     sql = sql.rstrip("; \t\n")

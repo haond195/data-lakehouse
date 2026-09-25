@@ -101,35 +101,43 @@ Hệ thống được đóng gói hoàn toàn bằng Docker Compose, hoạt đ�
 Dữ liệu được xử lý qua 3 tầng chuẩn công nghiệp **Medallion Architecture**:
 
 ```
-[Nguồn: TPC-DS SF1] 
+[Nguồn: TPC-DS SF1 / Files / RDBMS] 
        │ 
        ▼ (1. Extract thô nguyên bản)
 [TẦNG BRONZE: retail_bronze] ── Lưu thô, bổ sung audit timestamp (_ingested_at)
        │ 
-       ▼ (2. Clean, Type cast, COALESCE NULLs)
+       ▼ (2. Clean, Type cast, COALESCE NULLs, Joins)
 [TẦNG SILVER: retail_silver] ── Làm sạch, lọc giao dịch lỗi, khử giá trị NULL
        │ 
        ▼ (3. Pre-aggregate Business KPIs)
 [TẦNG GOLD:   retail_gold]   ── Bảng Data Marts tính sẵn phục vụ Superset & AI
 ```
 
-### 3.1. Tầng Bronze: `iceberg.retail_bronze`
-* **Bảng chính:** `store_sales_raw` (100.000 dòng).
-* **Nhiệm vụ:** Nạp dữ liệu thô nguyên bản từ nguồn, không can thiệp logic nghiệp vụ.
-* **Cột Audit:** `_ingested_at TIMESTAMP` (thời điểm dữ liệu được nạp vào Lakehouse).
+### 3.1. 5 Kỹ thuật ETL cốt lõi được triển khai trong Pipeline
+1. **Kiến trúc Medallion (Multi-Hop Storage Pattern):**
+   * Tách bạch 3 vùng lưu trữ độc lập trên Apache Iceberg/MinIO: `Bronze` (thô) ➔ `Silver` (làm sạch) ➔ `Gold` (tổng hợp phân tích).
+2. **Lọc dữ liệu rác & Dị thường (Data Filtering & Validation):**
+   * Lọc bỏ đơn hàng âm hoặc thiếu giá trị thanh toán: `WHERE raw_net_paid IS NOT NULL AND raw_quantity > 0` (loại bỏ 7.724 bản ghi bất thường từ TPC-DS).
+3. **Xử lý giá trị thiếu bằng nhãn nghiệp vụ (Data Imputation với `COALESCE`):**
+   * Gán giá trị mặc định cho dữ liệu NULL để bảo toàn tính toàn vẹn báo cáo: `COALESCE(store_name, 'Online / Non-Store')`, `COALESCE(category, 'Uncategorized')`, `COALESCE(customer_id, 0)`.
+4. **Làm phẳng dữ liệu theo mô hình hình sao (Denormalization & Star Schema Joins):**
+   * Liên kết bảng Fact giao dịch với các Dimension (`date_dim`, `item`, `store`) thành bảng phẳng duy nhất ở tầng Silver giúp BI và AI truy vấn không cần JOIN phức tạp.
+5. **Tính toán an toàn & Kiểm toán dòng đời (Safe Math & Lineage Auditing):**
+   * Tránh lỗi chia cho 0 bằng `NULLIF`: `ROUND((SUM(net_profit) / NULLIF(SUM(net_revenue), 0)) * 100, 2) AS profit_margin_pct`.
+   * Gắn nhãn thời gian truy vết ở từng tầng: `_ingested_at` (Bronze), `_transformed_at` (Silver), `_calculated_at` (Gold).
 
-### 3.2. Tầng Silver: `iceberg.retail_silver`
-* **Bảng chính:** `sales_transactions` (92.276 dòng).
-* **Nhiệm vụ:** 
-  * Lọc dữ liệu lỗi: `WHERE raw_net_paid IS NOT NULL AND raw_quantity > 0` (loại bỏ 7.724 dòng đơn hàng rác/âm).
-  * Chuẩn hóa kiểu dữ liệu: Ép kiểu số thực `DOUBLE`, định dạng ngày `DATE`.
-  * Khử `NULL` bằng nhãn có nghĩa: `COALESCE(store_name, 'Online / Non-Store')`, `COALESCE(category, 'Uncategorized')`.
-* **Cột Audit:** `_transformed_at TIMESTAMP`.
+### 3.2. Chi tiết phân tầng dữ liệu
+* **Tầng Bronze (`iceberg.retail_bronze.store_sales_raw` - 100.000 dòng):** Tiếp nhận dữ liệu nguồn thô, lưu trữ dạng Parquet trên S3.
+* **Tầng Silver (`iceberg.retail_silver.sales_transactions` - 92.276 dòng):** Dữ liệu chuẩn hóa, khử NULL, ép kiểu `DOUBLE` và định dạng ngày tháng.
+* **Tầng Gold (`iceberg.retail_gold.mart_monthly_store_performance` - 4.133 dòng):** Gom nhóm tính sẵn doanh thu, lợi nhuận theo Tháng/Cửa hàng/Ngành hàng, phản hồi trong **0,18s**.
 
-### 3.3. Tầng Gold: `iceberg.retail_gold`
-* **Bảng tổng hợp:** `mart_monthly_store_performance` (4.133 dòng).
-* **Bảng tổng hợp ngày:** `store_performance_daily` (7 dòng).
-* **Nhiệm vụ:** Gom nhóm sẵn theo Năm, Tháng, Chi nhánh, Ngành hàng; tính sẵn `total_orders`, `total_revenue`, `total_profit`, `profit_margin_pct`. Giúp Dashboard tải tức thì trong 0,1s.
+### 3.3. Tự động hóa với mô hình Config-driven ETL
+Hệ thống hỗ trợ cơ chế nạp dữ liệu không cần viết lại mã nguồn Python:
+* **File cấu hình YAML ([config/etl_pipeline.yaml](file:///D:/local-lakehouse/config/etl_pipeline.yaml)):** Khai báo nguồn dữ liệu, danh sách cột mapping tầng Bronze, điều kiện lọc tầng Silver, và các chỉ số tổng hợp tầng Gold.
+* **Engine điều phối ([scripts/dynamic_etl_runner.py](file:///D:/local-lakehouse/scripts/dynamic_etl_runner.py)):** Đọc cấu hình YAML và tự động sinh SQL Trino tương ứng để thực thi toàn trình Bronze ➔ Silver ➔ Gold. Khi có bộ dữ liệu mới, chỉ cần tạo 1 file YAML mới và chạy:
+  ```bash
+  python scripts/dynamic_etl_runner.py config/<pipeline_moi>.yaml
+  ```
 
 ---
 
