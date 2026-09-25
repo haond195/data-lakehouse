@@ -80,21 +80,27 @@ Hệ thống tổ chức dữ liệu theo chuẩn công nghiệp **Medallion Arc
 [TẦNG GOLD:   retail_gold]   ── Chiến lược: UPSERT / AGGREGATION (Data Marts cho BI/AI)
 ```
 
-### 3.1. Phân tầng Medallion
-* **🥉 Tầng Bronze (`iceberg.retail_bronze`):**
-  * *Bản chất:* Nơi tiếp nhận dữ liệu thô đầu tiên từ các hệ thống nguồn (Raw Zone).
-  * *Bảng mẫu:* `store_sales_raw` (100.000 dòng).
-  * *Chiến lược:* **APPEND** — Dữ liệu mới được thêm liên tục vào cuối tập hợp, giữ nguyên cấu trúc thô, không sửa đổi logic và bổ sung mốc thời gian `_ingested_at` phục vụ kiểm toán (Data Audit).
+### 3.1. Phân tầng Medallion hoàn chỉnh 4 phân hệ nghiệp vụ
 
-* **🥈 Tầng Silver (`iceberg.retail_silver`):**
-  * *Bản chất:* Dữ liệu sau khi trải qua quá trình lọc sạch (Data Cleansing), kiểm tra hợp lệ (Validation) và chuẩn hóa cấu trúc (Standardization).
-  * *Bảng mẫu:* `sales_transactions` (92.276 dòng).
-  * *Chiến lược:* **OVERWRITE / REFRESH** — Lọc sạch các giao dịch lỗi (`net_paid IS NOT NULL AND quantity > 0`), liên kết khóa ngoại với các Dimension (Date, Store, Item) và chuyển đổi các giá trị `NULL` thành các nhãn có nghĩa bằng `COALESCE`.
+1. **🛍️ Phân hệ Bán hàng & Doanh thu (Retail Sales):**
+   * **Bronze:** `store_sales_raw` (100.000 dòng).
+   * **Silver:** `sales_transactions` (92.276 dòng) — Lọc dữ liệu rác, khử NULL bằng `COALESCE`, liên kết Dimension.
+   * **Gold:** `mart_monthly_store_performance` (4.133 dòng), `store_performance_daily` (7 dòng).
 
-* **🥇 Tầng Gold (`iceberg.retail_gold`):**
-  * *Bản chất:* Tầng tinh chế dữ liệu kinh doanh cuối cùng (Curated Business-level Marts).
-  * *Bảng mẫu:* `mart_monthly_store_performance` (4.133 dòng), `store_performance_daily` (7 dòng).
-  * *Chiến lược:* **UPSERT / AGGREGATION** — Tổng hợp sẵn các chỉ số KPI theo Tháng/Cửa hàng/Ngành hàng, giúp Dashboard trên Superset và câu truy vấn của AI Chatbot phản hồi tức thì trong **0,18 giây**.
+2. **📦 Phân hệ Chuỗi cung ứng & Kho - Kệ (Supply Chain & Inventory):**
+   * **Bronze:** `inventory_raw` (150.000 dòng), `warehouse_raw` (5 dòng).
+   * **Silver:** `inventory_snapshot` (142.546 dòng), `dim_warehouse` (5 dòng).
+   * **Gold:** `mart_inventory_turnover` (Vòng quay kho so với kệ), `mart_warehouse_utilization` (Mật độ lưu trữ).
+
+3. **🌐 Phân hệ Bán lẻ Đa kênh (Omnichannel: Store + Web + Catalog):**
+   * **Bronze:** `web_sales_raw` (50.000 dòng), `catalog_sales_raw` (50.000 dòng), `store_returns_raw` (25.000 dòng).
+   * **Silver:** `omnichannel_sales_transactions` (**191.790 dòng** hợp nhất cả 3 kênh bán hàng), `returns_transactions`.
+   * **Gold:** `mart_omnichannel_performance` (Đối soát doanh thu 3 kênh), `mart_returns_analysis` (Phân tích lý do đổi trả).
+
+4. **🎯 Phân hệ Khuyến mãi & Khách hàng 360 (Promotions & Customer 360):**
+   * **Bronze:** `promotion_raw` (300 dòng), `customer_raw` (100.000 dòng), `customer_demographics_raw` (1.92M dòng).
+   * **Silver:** `dim_promotion` (300 dòng), `dim_customer_360` (100.000 dòng).
+   * **Gold:** `mart_promotion_sales_performance` (Doanh số theo campaign), `mart_customer_segmentation` (12.079 phân khúc).
 
 ---
 
@@ -109,9 +115,9 @@ Toàn bộ công thức tính toán tài chính được đóng gói tại View 
 | **Doanh thu thuần** | `ROUND(SUM(net_revenue), 2)` | Doanh thu thực nhận sau khi đã trừ giảm giá và chiết khấu. |
 | **Doanh thu gộp** | `ROUND(SUM(gross_revenue), 2)` | Doanh thu tính theo giá niêm yết ban đầu (`list_price * quantity`). |
 | **Lợi nhuận thuần** | `ROUND(SUM(net_profit), 2)` | Lợi nhuận ròng sau khi trừ giá vốn hàng bán và chi phí trực tiếp. |
-| **Biên lợi nhuận %**| `ROUND((SUM(net_profit) / SUM(net_revenue)) * 100, 2)` | Tỷ suất sinh lời (`Profit Margin %`) của từng danh mục và cửa hàng. |
+| **Biên lợi nhuận %**| `ROUND((SUM(net_profit) / NULLIF(SUM(net_revenue), 0)) * 100, 2)` | Tỷ suất sinh lời (`Profit Margin %`) của từng danh mục và cửa hàng. |
 | **Tổng số đơn hàng**| `COUNT(DISTINCT order_id)` | Lượng đơn hàng phát sinh thực tế (loại bỏ trùng lặp mã đơn). |
-| **Số lượng bán ra** | `SUM(quantity_sold)` | Tổng số đơn vị sản phẩm tiêu thụ. |
+| **Vòng quay kho/kệ**| `ROUND(units_sold_on_shelf / NULLIF(total_warehouse_stock, 0), 4)` | Tốc độ tiêu thụ hàng hóa trên kệ so với lượng tồn kho. |
 
 ---
 
@@ -120,12 +126,12 @@ Toàn bộ công thức tính toán tài chính được đóng gói tại View 
 Ứng dụng Streamlit được tích hợp sâu vào hệ thống với cơ chế **Dual Engine**:
 
 1. **Cloud LLM Engine (DeepSeek-V4-Flash / Google Gemini):**
-   * Đọc schema thực tế của Lakehouse và tự động dịch câu hỏi ngôn ngữ tự nhiên (tiếng Việt/tiếng Anh) thành cú pháp Trino SQL chuẩn xác.
-   * Tối ưu hóa thời gian suy luận: Rút gọn prompt, cấu hình `max_tokens=1000` và nâng `timeout=75s` giúp trả lời câu hỏi phức tạp chỉ sau **12–15 giây**.
+   * Đọc schema thực tế của Lakehouse và tự động dịch câu hỏi ngôn ngữ tự nhiên thành cú pháp Trino SQL chuẩn xác.
+   * Tự động quét và hỗ trợ toàn bộ **9 bảng Gold Data Marts**.
 2. **Smart Rule Parser (Chế độ dự phòng nội bộ):**
    * Tự động kích hoạt khi mất kết nối mạng hoặc không có API Key, đảm bảo hệ thống không bao giờ bị gián đoạn hoạt động.
 3. **Bộ lọc làm sạch SQL (`clean_generated_sql`):**
-   * Tự động trích xuất khối lệnh `SELECT`, loại bỏ văn bản markdown thừa và cắt bỏ dấu chấm phẩy `;` cuối dòng để đảm bảo Trino DBAPI thực thi không lỗi.
+   * Hỗ trợ đầy đủ cú pháp CTE (`WITH ... AS (...)`) và lệnh `SELECT`, loại bỏ ký tự thừa và dấu chấm phẩy `;` cuối dòng.
 
 ---
 
@@ -140,23 +146,29 @@ cd D:\local-lakehouse
 docker compose up -d
 ```
 
-### 6.2. Chạy Pipeline ETL dữ liệu TPC-DS SF1
+### 6.2. Thực thi các Pipeline ETL Medallion
 ```powershell
-python -X utf8 D:\local-lakehouse\scripts\etl_tpcds_sf1.py
-```
-*Kết quả:* Nạp và biến đổi thành công **100.000 dòng Bronze** ➔ **92.276 dòng Silver** ➔ **4.133 dòng Gold KPIs** trong **5,01 giây**.
+# 1. Pipeline Bán lẻ cơ bản (TPC-DS Store Sales)
+python scripts/etl_tpcds_sf1.py
 
-### 6.3. Chạy Config-driven ETL (Tự động hóa với YAML)
-```powershell
+# 2. Pipeline Chuỗi cung ứng, Tồn kho & Đối soát Kho - Kệ
+python scripts/etl_supply_chain_inventory.py
+
+# 3. Pipeline Khuyến mãi & Khách hàng 360 độ
+python scripts/etl_promo_customer360.py
+
+# 4. Pipeline Đa kênh (Store, Web, Catalog) & Giao vận, Đổi trả
+python scripts/etl_omnichannel_logistics.py
+
+# 5. Config-driven ETL linh hoạt qua file YAML
 python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
 ```
-*Ưu điểm:* Khi có dữ liệu mới, chỉ cần tạo file YAML mô tả cột và quy tắc chuyển đổi mà không cần sửa code Python.
 
-### 6.4. Bảng điều khiển dịch vụ & Thông tin đăng nhập
+### 6.3. Bảng điều khiển dịch vụ & Thông tin đăng nhập
 
 | Dịch vụ | Địa chỉ Web (URL) | Tài khoản / Thông tin | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| **Apache Superset** | `http://localhost:8089` | `admin` / `admin` | Đã liên kết sẵn Trino & 4 Datasets |
+| **Apache Superset** | `http://localhost:8089` | `admin` / `admin` | Đã liên kết sẵn Trino & Data Marts |
 | **AI Data Assistant** | `http://localhost:8501` | Mở trực tiếp hoặc icon `🤖` trên Superset | Text-to-SQL + Auto Chart |
 | **Trino Web UI** | `http://localhost:8080` | Username: `admin` | Giám sát query phân tán |
 | **MinIO Console** | `http://localhost:9001` | `admin` / `password123` | Quản trị S3 Bucket `warehouse` |
@@ -169,12 +181,16 @@ python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
 ```text
 D:\local-lakehouse\
 ├── config\
-│   └── etl_pipeline.yaml           # Cấu hình mẫu cho Config-driven ETL
+│   ├── etl_pipeline.yaml           # Cấu hình ETL Bán hàng mẫu
+│   └── inventory_pipeline.yaml     # Cấu hình ETL Tồn kho mẫu
 ├── chatbot\
-│   └── app.py                      # Ứng dụng Streamlit Text-to-SQL tích hợp DeepSeek & Gemini
+│   └── app.py                      # Ứng dụng Streamlit Text-to-SQL nhận diện 9 Gold Marts
 ├── scripts\
-│   ├── dynamic_etl_runner.py       # Engine thực thi ETL động từ file YAML
-│   ├── etl_tpcds_sf1.py            # Pipeline ETL toàn trình chuẩn Medallion từ TPC-DS SF1
+│   ├── dynamic_etl_runner.py       # Engine thực thi ETL động từ YAML
+│   ├── etl_tpcds_sf1.py            # Pipeline ETL Bán lẻ cơ bản
+│   ├── etl_supply_chain_inventory.py # Pipeline ETL Tồn kho & Kho - Kệ
+│   ├── etl_promo_customer360.py    # Pipeline ETL Khuyến mãi & Khách hàng 360
+│   ├── etl_omnichannel_logistics.py # Pipeline ETL Đa kênh & Đổi trả
 │   └── run_etl.py                  # Script ETL mẫu cho môi trường cục bộ
 ├── trino-catalog\
 │   ├── iceberg.properties          # Cấu hình Iceberg Catalog (MinIO S3 + Postgres JDBC)
