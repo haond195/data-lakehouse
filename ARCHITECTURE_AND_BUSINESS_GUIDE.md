@@ -144,6 +144,18 @@ Dữ liệu được xử lý qua 3 tầng chuẩn công nghiệp **Medallion Ar
   * `retail_gold.mart_inventory_turnover` (667 dòng): Đối soát hàng bán trên kệ (`sales_transactions`) với hàng tồn kho (`inventory_snapshot`), tính tỷ lệ quay vòng kho - kệ (`shelf_to_warehouse_ratio`).
   * `retail_gold.mart_warehouse_utilization` (5 dòng): Đo lường mật độ lưu trữ (`density_units_per_sq_ft`) và tổng giá trị hàng hóa tại từng kho.
 
+#### C. Phân hệ Khuyến mãi & Khách hàng 360 (Promotion & Customer 360 Domain):
+* **🥉 Tầng Bronze:**
+  * `retail_bronze.promotion_raw` (300 dòng): Dữ liệu chiến dịch marketing thô.
+  * `retail_bronze.customer_raw` (100.000 dòng): Thông tin định danh khách hàng.
+  * `retail_bronze.customer_demographics_raw` (1.920.800 dòng): Dữ liệu nhân khẩu học (giới tính, học vấn, tín dụng).
+* **🥈 Tầng Silver:**
+  * `retail_silver.dim_promotion` (300 dòng): Chuẩn hóa chi phí và kênh marketing (Email, TV).
+  * `retail_silver.dim_customer_360` (100.000 dòng): Hợp nhất họ tên, email, quốc gia, tình trạng hôn nhân, học vấn và xếp hạng tín dụng.
+* **🥇 Tầng Gold:**
+  * `retail_gold.mart_promotion_sales_performance` (300 dòng): Đánh giá doanh thu và lợi nhuận tạo ra từ từng chương trình khuyến mãi.
+  * `retail_gold.mart_customer_segmentation` (12.079 dòng): Phân khúc khách hàng đa chiều theo Quốc gia, Giới tính, Học vấn và Xếp hạng tín dụng.
+
 ### 3.3. Tự động hóa với mô hình Config-driven ETL
 Hệ thống hỗ trợ cơ chế nạp dữ liệu không cần viết lại mã nguồn Python:
 * **File cấu hình YAML ([config/etl_pipeline.yaml](file:///D:/local-lakehouse/config/etl_pipeline.yaml)):** Khai báo nguồn dữ liệu, danh sách cột mapping tầng Bronze, điều kiện lọc tầng Silver, và các chỉ số tổng hợp tầng Gold.
