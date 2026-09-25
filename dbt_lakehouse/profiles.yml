@@ -1,0 +1,14 @@
+lakehouse_trino:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      user: admin
+      password: ""
+      host: localhost
+      port: 8080
+      database: iceberg
+      schema: retail_gold
+      threads: 4
+      client_tags: ["dbt", "lakehouse"]

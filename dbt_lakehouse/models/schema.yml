@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_store_sales
+    description: "Tầng Bronze: Dữ liệu đơn hàng thô nạp từ TPC-DS"
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+
+  - name: fct_sales_clean
+    description: "Tầng Silver: Dữ liệu bán hàng đã làm sạch và khử null"
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: net_revenue
+        tests:
+          - not_null
+
+  - name: mart_store_sales_kpis
+    description: "Tầng Gold: Chỉ số KPI doanh thu và lợi nhuận theo tháng"
+    columns:
+      - name: total_orders
+        tests:
+          - not_null

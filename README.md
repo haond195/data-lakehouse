@@ -162,6 +162,9 @@ python scripts/etl_omnichannel_logistics.py
 
 # 5. Config-driven ETL linh hoạt qua file YAML
 python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
+
+# 6. Chạy chuẩn hóa Transformation & Data Testing với dbt-trino
+python scripts/run_dbt.py
 ```
 
 ### 6.3. Bảng điều khiển dịch vụ & Thông tin đăng nhập
@@ -183,6 +186,10 @@ python scripts/dynamic_etl_runner.py config/etl_pipeline.yaml
 
 ```text
 D:\local-lakehouse\
+├── dbt_lakehouse\               # Dự án dbt-trino chuẩn công nghiệp (Models, Lineage, Tests)
+│   ├── dbt_project.yml         # Cấu hình dự án dbt Medallion
+│   ├── profiles.yml            # Kết nối Trino Iceberg Engine
+│   └── models/                 # Bronze, Silver, Gold models & Data Quality Tests
 ├── config\
 │   ├── etl_pipeline.yaml           # Cấu hình ETL Bán hàng mẫu
 │   └── inventory_pipeline.yaml     # Cấu hình ETL Tồn kho mẫu

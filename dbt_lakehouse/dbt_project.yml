@@ -1,0 +1,28 @@
+name: 'lakehouse_transformation'
+version: '1.0.0'
+config-version: 2
+
+profile: 'lakehouse_trino'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  lakehouse_transformation:
+    bronze:
+      +schema: retail_bronze
+      +materialized: table
+    silver:
+      +schema: retail_silver
+      +materialized: table
+    gold:
+      +schema: retail_gold
+      +materialized: table

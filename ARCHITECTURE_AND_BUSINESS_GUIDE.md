@@ -188,6 +188,21 @@ Dữ liệu được xử lý qua 3 tầng chuẩn công nghiệp **Medallion Ar
   * `retail_gold.mart_omnichannel_performance` (126 dòng): Đối soát so sánh doanh thu, đơn hàng, giá trị trung bình đơn (AOV) giữa 3 kênh Store vs Web vs Catalog theo Tháng/Năm.
   * `retail_gold.mart_returns_analysis` (76 dòng): Phân tích chi tiết số lượng hàng trả và tổng tiền hoàn theo từng lý do trả hàng.
 
+### 3.4. Chuẩn hóa tầng Transformation với dbt-trino
+Hệ thống tích hợp framework **dbt-trino** (data build tool) chuẩn Enterprise để quản lý biến đổi dữ liệu và kiểm định tự động:
+* **Thư mục dự án:** dbt_lakehouse/
+* **Mô hình Medallion:**
+  * Bronze: models/bronze/stg_store_sales.sql (materialized='table')
+  * Silver: models/silver/fct_sales_clean.sql (kết nối lineage qua {{ ref('stg_store_sales') }})
+  * Gold: models/gold/mart_store_sales_kpis.sql (tính sẵn AOV và Margin qua {{ ref('fct_sales_clean') }})
+* **Kiểm định chất lượng tự động (Data Quality Testing):** Tự động kiểm tra 
+ot_null, unique qua schema.yml.
+* **Thực thi:**
+  `ash
+  python scripts/run_dbt.py
+  # hoặc: cd dbt_lakehouse && dbt run && dbt test
+  `
+
 ### 3.3. Tự động hóa với mô hình Config-driven ETL
 Hệ thống hỗ trợ cơ chế nạp dữ liệu không cần viết lại mã nguồn Python:
 * **File cấu hình YAML ([config/etl_pipeline.yaml](file:///D:/local-lakehouse/config/etl_pipeline.yaml)):** Khai báo nguồn dữ liệu, danh sách cột mapping tầng Bronze, điều kiện lọc tầng Silver, và các chỉ số tổng hợp tầng Gold.

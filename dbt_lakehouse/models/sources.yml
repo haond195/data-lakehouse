@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: tpcds_source
+    database: tpcds
+    schema: sf1
+    tables:
+      - name: store_sales
+      - name: date_dim
+      - name: item
+      - name: store

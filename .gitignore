@@ -18,3 +18,8 @@ __pycache__/
 Thumbs.db
 desktop.ini
 *.log
+
+# dbt artifacts
+dbt_lakehouse/target/
+dbt_lakehouse/logs/
+dbt_lakehouse/dbt_packages/
