@@ -282,13 +282,13 @@ Hệ thống AI Chatbot hoạt động theo cơ chế **Dual Engine (Động cơ
 
 | Ứng dụng | Địa chỉ Web (URL) | Tài khoản / Mật khẩu | Quyền hạn & Vai trò |
 | :--- | :--- | :--- | :--- |
-| **Apache Superset** | http://localhost:8089 | dmin / dmin | **Admin:** Toàn quyền quản trị hệ thống |
-| **Apache Superset** | http://localhost:8089 | nalyst / nalyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
-| **Trino CLI / JDBC** | localhost:8080 | User: dmin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
-| **Trino CLI / JDBC** | localhost:8080 | User: nalyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
+| **Apache Superset** | http://localhost:8089 | admin / admin | **Admin:** Toàn quyền quản trị hệ thống |
+| **Apache Superset** | http://localhost:8089 | analyst / analyst123 | **Gamma (Analyst):** Xem Dashboard, không sửa kết nối |
+| **Trino CLI / JDBC** | localhost:8080 | User: admin | Toàn quyền DDL, DML trên toàn bộ các Catalog |
+| **Trino CLI / JDBC** | localhost:8080 | User: analyst | **Chỉ đọc (SELECT)** trên tầng Gold, **CẤM** tầng Bronze/Silver |
 | **AI Chatbot** | http://localhost:8501 | Mở trực tiếp | Hỏi đáp tự động với các Gold Marts |
-| **Trino Web UI** | http://localhost:8080 | User: dmin | Theo dõi truy vấn & hiệu năng cụm |
-| **MinIO Console** | http://localhost:9001 | dmin / password123 | Quản trị S3 Object Storage |
+| **Trino Web UI** | http://localhost:8080 | User: admin | Theo dõi truy vấn & hiệu năng cụm |
+| **MinIO Console** | http://localhost:9001 | admin / password123 | Quản trị S3 Object Storage |
 | **PostgreSQL** | localhost:5433 | User: postgres, DB: metastore | Lưu trữ siêu dữ liệu Catalog |
 
 ### 6.2. Các lệnh vận hành thường dùng (CLI PowerShell)
@@ -321,20 +321,17 @@ Hệ thống AI Chatbot hoạt động theo cơ chế **Dual Engine (Động cơ
 
 Hệ thống triển khai cơ chế phân quyền RBAC độc lập, hiệu năng cao mà **không cần phụ thuộc vào Apache Ranger**:
 
-1. **Trino File-based Access Control (	rino-security/rules.json):**
-   * Được cấu hình qua ccess-control.properties với cơ chế kiểm soát trực tiếp trong nhân Trino (tốn 0 MB RAM phụ trợ).
-   * **Tài khoản nalyst:**
-     * Quyền trên 
-etail_gold: Chỉ được phép SELECT.
-     * Quyền trên 
-etail_bronze & 
-etail_silver: privileges: [] -> Trino lập tức trả về lỗi Access Denied: Cannot select from table... nếu cố tình truy vấn dữ liệu thô.
+1. **Trino File-based Access Control (`trino-security/rules.json`):**
+   * Được cấu hình qua access-control.properties với cơ chế kiểm soát trực tiếp trong nhân Trino (tốn 0 MB RAM phụ trợ).
+   * **Tài khoản analyst:**
+     * Quyền trên `retail_gold`: Chỉ được phép SELECT.
+     * Quyền trên `retail_bronze` & `retail_silver`: privileges: [] -> Trino lập tức trả về lỗi Access Denied: Cannot select from table... nếu cố tình truy vấn dữ liệu thô.
      * Quyền DDL: Bị tước bỏ quyền DROP TABLE, DROP VIEW, ALTER để bảo vệ toàn vẹn dữ liệu.
-   * **Tài khoản dmin & etl_*:** Có đầy đủ quyền DDL/DML phục vụ quá trình pipeline và quản trị hệ thống.
+   * **Tài khoản admin & etl_*:** Có đầy đủ quyền DDL/DML phục vụ quá trình pipeline và quản trị hệ thống.
 
 2. **Superset Role-Based Access Control (RBAC):**
    * **Role Admin:** Toàn quyền cấu hình kết nối Database, tạo Schema, quản trị người dùng.
-   * **Role Gamma (nalyst):** Người dùng nghiệp vụ chỉ được xem biểu đồ và Dashboard được cấp phép, không thể can thiệp vào tầng kết nối hạ tầng.
+   * **Role Gamma (analyst):** Người dùng nghiệp vụ chỉ được xem biểu đồ và Dashboard được cấp phép, không thể can thiệp vào tầng kết nối hạ tầng.
 
 
 ---
@@ -355,9 +352,8 @@ etail_silver: privileges: [] -> Trino lập tức trả về lỗi Access Denied
 4. **Bộ chỉ số phân tích nghiệp vụ chuyên sâu (Semantic Views):**
    * Đóng gói sẵn các công thức tài chính chuẩn hóa: AOV, AUP, Net Margin %, DSI, Vòng quay tồn kho, Tỷ trọng doanh thu kênh, Campaign ROI %, Return Rate %.
 5. **Bảo mật & Phân quyền RBAC nội bộ không cần Apache Ranger:**
-   * Phân quyền trực tiếp trong Trino qua 
-ules.json: Tài khoản nalyst chỉ được đọc tầng Gold, bị chặn hoàn toàn khi truy cập tầng Bronze/Silver hoặc cố tình thực hiện lệnh phá hoại (DROP TABLE/VIEW).
-   * Phân quyền vai trò trên Apache Superset giữa nhóm Admin và nhóm nghiệp vụ Gamma (nalyst).
+   * Phân quyền trực tiếp trong Trino qua `rules.json`: Tài khoản analyst chỉ được đọc tầng Gold, bị chặn hoàn toàn khi truy cập tầng Bronze/Silver hoặc cố tình thực hiện lệnh phá hoại (DROP TABLE/VIEW).
+   * Phân quyền vai trò trên Apache Superset giữa nhóm Admin và nhóm nghiệp vụ Gamma (analyst).
 6. **Trợ lý Phân tích AI Text-to-SQL Động cơ kép:**
    * Tự động quét cấu trúc 9 bảng/view Gold trong thời gian thực (Schema Introspection), sinh câu lệnh SQL chuẩn Trino (hỗ trợ cả CTE WITH phức tạp) và tự động trực quan hóa biểu đồ.
 
