@@ -157,12 +157,13 @@ Rules:
 - Use ROUND(..., 2) for currency, averages, or profit amounts.
 - Limit top/bottom queries with LIMIT N (default 10).
 - Do not add semicolons at the end of the query.
+- Do NOT truncate or leave clauses unclosed.
 """
 
 def clean_generated_sql(raw_text: str) -> str:
     if not raw_text:
         return ""
-    match_code = re.search(r"```(?:sql)?\s*([\s\S]*?)\s*```", raw_text, flags=re.IGNORECASE)
+    match_code = re.search(r"```(?:sql)?\s*([\s\S]*?)(?:```|$)", raw_text, flags=re.IGNORECASE)
     if match_code:
         sql = match_code.group(1).strip()
     else:
@@ -193,14 +194,17 @@ def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, mo
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": f"User question: {user_prompt}\nGenerate Trino SQL query:"}
         ],
-        "max_tokens": 1000,
+        "max_tokens": 4000,
         "temperature": 0.1
     }
     resp = requests.post(endpoint, headers=headers, json=payload, timeout=75)
     resp.raise_for_status()
     data = resp.json()
-    choice = data.get("choices", [{}])[0].get("message", {})
-    raw_content = choice.get("content") or choice.get("reasoning_content") or ""
+    choice = data.get("choices", [{}])[0]
+    message = choice.get("message", {})
+    raw_content = message.get("content") or ""
+    if not raw_content.strip():
+        raw_content = message.get("reasoning_content") or ""
     return clean_generated_sql(str(raw_content).strip())
 
 def generate_sql_with_gemini(user_prompt: str, key: str, model: str, target_catalog: str, target_schema: str) -> str:
