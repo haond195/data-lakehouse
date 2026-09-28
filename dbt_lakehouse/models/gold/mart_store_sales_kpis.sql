@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    schema='retail_gold'
+    schema='stg_gold' if target.name == 'stg' else 'retail_gold'
 ) }}
 
 SELECT 

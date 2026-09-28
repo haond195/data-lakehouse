@@ -46,7 +46,7 @@ html, body, [class*="css"], .stMarkdown, p, span, h1, h2, h3, button, input {
 """, unsafe_allow_html=True)
 
 st.title("🤖 AI Data Analyst Chatbot")
-st.markdown("Trợ lý phân tích dữ liệu tự động truy vấn vào **Trino**, **Apache Iceberg** và **MinIO (S3)**.")
+st.markdown("Trợ lý phân tích dữ liệu tự động truy vấn vào **Trino**, **Apache Iceberg Lakehouse**.")
 
 # Sidebar cấu hình Nhà cung cấp AI
 st.sidebar.header("⚙️ Cấu hình Nhà Cung Cấp AI")
@@ -94,58 +94,66 @@ else:
     else:
         st.sidebar.info("⚪ Nhập API Key bên trên để bật AI LLM")
 
-# Cấu hình Schema
+# Cấu hình Catalog & Schema
 st.sidebar.markdown("---")
-st.sidebar.header("🎯 Cấu hình Schema Lakehouse")
+st.sidebar.header("🎯 Cấu hình Lakehouse")
+selected_catalog = st.sidebar.selectbox(
+    "Catalog Lakehouse",
+    ["iceberg_stg", "iceberg"],
+    index=0
+)
+
+available_schemas = ["stg_gold", "stg_silver", "stg_bronze"] if selected_catalog == "iceberg_stg" else ["retail_gold", "retail_silver", "retail_bronze"]
+
 selected_schema = st.sidebar.selectbox(
     "Schema phân tích",
-    ["retail_gold", "retail_silver", "retail_bronze"],
+    available_schemas,
     index=0,
-    help="AI sẽ tự động quét toàn bộ bảng và cột trong Schema này để sinh câu lệnh SQL chính xác."
+    help="AI sẽ tự động quét toàn bộ bảng và cột trong Catalog/Schema này để sinh câu lệnh SQL chính xác."
 )
 
 # Kết nối Trino
 @st.cache_resource
-def get_trino_conn(schema: str = "retail_gold"):
+def get_trino_conn(catalog: str = "iceberg_stg", schema: str = "stg_gold"):
     return connect(
         host=os.getenv("TRINO_HOST", "localhost"),
         port=8080,
         user="ai_analyst",
-        catalog="iceberg",
+        catalog=catalog,
         schema=schema
     )
 
 @st.cache_data(ttl=120)
-def get_dynamic_schema(target_schema: str = "retail_gold") -> str:
+def get_dynamic_schema(target_catalog: str, target_schema: str) -> str:
     try:
-        conn = get_trino_conn(target_schema)
+        conn = get_trino_conn(target_catalog, target_schema)
         cur = conn.cursor()
-        cur.execute(f"SHOW TABLES FROM iceberg.{target_schema}")
+        cur.execute(f"SHOW TABLES FROM {target_catalog}.{target_schema}")
         tables = [r[0] for r in cur.fetchall()]
         parts = []
         for tbl in tables:
             try:
-                cur.execute(f"DESCRIBE iceberg.{target_schema}.{tbl}")
+                cur.execute(f"DESCRIBE {target_catalog}.{target_schema}.{tbl}")
                 cols = [f"{r[0]} ({r[1]})" for r in cur.fetchall()]
-                parts.append(f"Table: iceberg.{target_schema}.{tbl}\nColumns: {', '.join(cols)}")
+                parts.append(f"Table: {target_catalog}.{target_schema}.{tbl}\nColumns: {', '.join(cols)}")
             except Exception:
                 pass
-        return "\n\n".join(parts) if parts else f"Schema: iceberg.{target_schema}"
+        return "\n\n".join(parts) if parts else f"Schema: {target_catalog}.{target_schema}"
     except Exception as e:
-        return f"Schema: iceberg.{target_schema} (Lỗi quét schema: {e})"
+        return f"Schema: {target_catalog}.{target_schema} (Lỗi quét schema: {e})"
 
-def build_system_prompt(target_schema: str = "retail_gold") -> str:
-    schema_info = get_dynamic_schema(target_schema)
+def build_system_prompt(target_catalog: str, target_schema: str) -> str:
+    schema_info = get_dynamic_schema(target_catalog, target_schema)
     return f"""You are an expert Trino SQL Data Analyst for an Apache Iceberg Lakehouse.
 Generate ONLY valid Trino SQL. Think concisely and output the SQL query directly.
 
-Real-time Database Schema for iceberg.{target_schema} (quét trực tiếp từ Lakehouse):
+Real-time Database Schema for {target_catalog}.{target_schema} (quét trực tiếp từ Lakehouse):
 {schema_info}
 
 Rules:
 - Output ONLY the executable SQL query starting with SELECT or WITH. No explanation, no markdown text outside code.
 - STRICT: Use ONLY the exact column names provided in the schema above. Do NOT invent columns that do not exist.
-- Always use full table names: iceberg.{target_schema}.<table_name>
+- Always use full table names: {target_catalog}.{target_schema}.<table_name>
 - Use ROUND(..., 2) for currency, averages, or profit amounts.
 - Limit top/bottom queries with LIMIT N (default 10).
 - Do not add semicolons at the end of the query.
@@ -169,7 +177,7 @@ def clean_generated_sql(raw_text: str) -> str:
     sql = sql.rstrip("; \t\n")
     return sql
 
-def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, model: str, target_schema: str) -> str:
+def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, model: str, target_catalog: str, target_schema: str) -> str:
     endpoint = url.rstrip("/")
     if not endpoint.endswith("/chat/completions"):
         endpoint = f"{endpoint}/chat/completions"
@@ -178,7 +186,7 @@ def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, mo
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json"
     }
-    sys_prompt = build_system_prompt(target_schema)
+    sys_prompt = build_system_prompt(target_catalog, target_schema)
     payload = {
         "model": model,
         "messages": [
@@ -195,12 +203,12 @@ def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, mo
     raw_content = choice.get("content") or choice.get("reasoning_content") or ""
     return clean_generated_sql(str(raw_content).strip())
 
-def generate_sql_with_gemini(user_prompt: str, key: str, model: str, target_schema: str) -> str:
+def generate_sql_with_gemini(user_prompt: str, key: str, model: str, target_catalog: str, target_schema: str) -> str:
     if not HAS_GENAI:
         raise RuntimeError("Thư viện google-generativeai chưa được cài đặt")
     genai.configure(api_key=key)
     m = genai.GenerativeModel(model)
-    full_prompt = f"""{build_system_prompt(target_schema)}
+    full_prompt = f"""{build_system_prompt(target_catalog, target_schema)}
 Question: {user_prompt}
 Trino SQL:"""
     resp = m.generate_content(full_prompt)
@@ -225,7 +233,7 @@ for msg in st.session_state.messages:
             elif isinstance(c_info, (tuple, list)) and len(c_info) == 2:
                 render_chart(msg["df"], "bar", c_info[0], c_info[1])
 
-user_input = st.chat_input(f"Nhập câu hỏi phân tích cho schema '{selected_schema}' hoặc nhập trực tiếp câu SQL...")
+user_input = st.chat_input(f"Nhập câu hỏi phân tích cho {selected_catalog}.{selected_schema} hoặc nhập trực tiếp câu SQL...")
 prompt = st.session_state.pop("prompt_input", None) or user_input
 
 if prompt:
@@ -241,11 +249,11 @@ if prompt:
         engine_used = "Truy vấn trực tiếp (Direct SQL)"
     elif api_key:
         try:
-            with st.spinner(f"🤖 {model_name} đang phân tích cấu trúc {selected_schema} để sinh SQL..."):
+            with st.spinner(f"🤖 {model_name} đang phân tích cấu trúc {selected_catalog}.{selected_schema} để sinh SQL..."):
                 if provider.startswith("FPT AI"):
-                    sql = generate_sql_with_openai_compatible(prompt, api_key, base_url, model_name, selected_schema)
+                    sql = generate_sql_with_openai_compatible(prompt, api_key, base_url, model_name, selected_catalog, selected_schema)
                 else:
-                    sql = generate_sql_with_gemini(prompt, api_key, model_name, selected_schema)
+                    sql = generate_sql_with_gemini(prompt, api_key, model_name, selected_catalog, selected_schema)
                 engine_used = f"{model_name} ({provider})"
         except Exception as err:
             err_msg = f"⚠️ Lỗi khi gọi AI ({err}). Vui lòng kiểm tra API Key hoặc nhập trực tiếp câu lệnh SQL."
@@ -262,7 +270,7 @@ if prompt:
             st.code(sql, language="sql")
 
             try:
-                conn = get_trino_conn(selected_schema)
+                conn = get_trino_conn(selected_catalog, selected_schema)
                 cursor = conn.cursor()
                 cursor.execute(sql)
                 columns = [desc[0] for desc in cursor.description]

@@ -18,11 +18,11 @@ clean-targets:
 models:
   lakehouse_transformation:
     bronze:
-      +schema: retail_bronze
+      +schema: "{{ 'stg_bronze' if target.name == 'stg' else 'retail_bronze' }}"
       +materialized: table
     silver:
-      +schema: retail_silver
+      +schema: "{{ 'stg_silver' if target.name == 'stg' else 'retail_silver' }}"
       +materialized: table
     gold:
-      +schema: retail_gold
+      +schema: "{{ 'stg_gold' if target.name == 'stg' else 'retail_gold' }}"
       +materialized: table

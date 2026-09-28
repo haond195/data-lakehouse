@@ -1,5 +1,5 @@
 lakehouse_trino:
-  target: dev
+  target: stg
   outputs:
     dev:
       type: trino
@@ -12,3 +12,14 @@ lakehouse_trino:
       schema: retail_gold
       threads: 4
       client_tags: ["dbt", "lakehouse"]
+    stg:
+      type: trino
+      method: none
+      user: admin
+      password: ""
+      host: localhost
+      port: 8080
+      database: iceberg_stg
+      schema: stg_gold
+      threads: 4
+      client_tags: ["dbt", "iceberg_stg"]
