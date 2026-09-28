@@ -14,4 +14,3 @@ SELECT
     sr_return_amt AS return_amount,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'store_returns') }}
-LIMIT 20000

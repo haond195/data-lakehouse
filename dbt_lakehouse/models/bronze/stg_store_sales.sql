@@ -14,4 +14,3 @@ SELECT
     ss_net_profit AS raw_net_profit,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'store_sales') }}
-LIMIT 50000

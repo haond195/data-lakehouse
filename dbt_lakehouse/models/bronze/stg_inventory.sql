@@ -10,4 +10,3 @@ SELECT
     inv_quantity_on_hand AS quantity_on_hand,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'inventory') }}
-LIMIT 50000

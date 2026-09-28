@@ -12,4 +12,3 @@ SELECT
     ca_country AS country,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'customer_address') }}
-LIMIT 20000

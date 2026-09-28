@@ -11,4 +11,3 @@ SELECT
     cd_credit_rating AS credit_rating,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'customer_demographics') }}
-LIMIT 20000

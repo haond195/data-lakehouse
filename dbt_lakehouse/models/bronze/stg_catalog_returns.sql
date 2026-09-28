@@ -13,4 +13,3 @@ SELECT
     cr_return_amount AS return_amount,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'catalog_returns') }}
-LIMIT 20000

@@ -14,4 +14,3 @@ SELECT
     d_day_name AS day_name,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'date_dim') }}
-WHERE d_year BETWEEN 1998 AND 2003

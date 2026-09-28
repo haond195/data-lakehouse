@@ -13,4 +13,3 @@ SELECT
     c_email_address AS email,
     CURRENT_TIMESTAMP AS _ingested_at
 FROM {{ source('tpcds_source', 'customer') }}
-LIMIT 20000
