@@ -18,9 +18,44 @@ models:
         tests:
           - not_null
 
+  - name: dim_products
+    description: "Tầng Silver: Danh mục sản phẩm đã chuẩn hóa"
+    columns:
+      - name: item_id
+        tests:
+          - not_null
+
+  - name: dim_stores
+    description: "Tầng Silver: Danh mục cửa hàng đã chuẩn hóa"
+    columns:
+      - name: store_id
+        tests:
+          - not_null
+
   - name: mart_store_sales_kpis
     description: "Tầng Gold: Chỉ số KPI doanh thu và lợi nhuận theo tháng"
     columns:
       - name: total_orders
+        tests:
+          - not_null
+
+  - name: mart_omnichannel_performance
+    description: "Tầng Gold: Hiệu suất bán hàng đa kênh Store vs Web vs Catalog"
+    columns:
+      - name: channel
+        tests:
+          - not_null
+
+  - name: mart_product_category_kpis
+    description: "Tầng Gold: Doanh thu theo ngành hàng và thương hiệu"
+    columns:
+      - name: category
+        tests:
+          - not_null
+
+  - name: mart_inventory_health
+    description: "Tầng Gold: Định giá và kiểm soát tồn kho theo kho hàng"
+    columns:
+      - name: warehouse_name
         tests:
           - not_null
