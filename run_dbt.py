@@ -1,5 +1,5 @@
 """
-RUNNER THỰC THI DBT-TRINO TRANSFORMATION & TESTS TRÊN LAKEHOUSE
+RUNNER THỰC THI DBT-TRINO TRANSFORMATION & TESTS TRÊN LAKEHOUSE (ROOT SHORTCUT)
 """
 import subprocess
 import sys
@@ -12,7 +12,7 @@ if sys.platform == "win32":
         pass
 
 def run_dbt():
-    dbt_dir = os.path.join(os.path.dirname(__file__), "..", "dbt_lakehouse")
+    dbt_dir = os.path.join(os.path.dirname(__file__), "dbt_lakehouse")
     dbt_dir = os.path.abspath(dbt_dir)
 
     print("=" * 65)
