@@ -27,7 +27,6 @@ def render_chart(df: pd.DataFrame, chart_type: str, col_x: str, col_y: str):
     else:
         st.bar_chart(df.set_index(col_x)[col_y])
 
-
 try:
     import google.generativeai as genai
     HAS_GENAI = True
@@ -95,59 +94,59 @@ else:
     else:
         st.sidebar.info("⚪ Nhập API Key bên trên để bật AI LLM")
 
+# Cấu hình Schema
+st.sidebar.markdown("---")
+st.sidebar.header("🎯 Cấu hình Schema Lakehouse")
+selected_schema = st.sidebar.selectbox(
+    "Schema phân tích",
+    ["retail_gold", "retail_silver", "retail_bronze"],
+    index=0,
+    help="AI sẽ tự động quét toàn bộ bảng và cột trong Schema này để sinh câu lệnh SQL chính xác."
+)
+
 # Kết nối Trino
 @st.cache_resource
-def get_trino_conn():
+def get_trino_conn(schema: str = "retail_gold"):
     return connect(
         host=os.getenv("TRINO_HOST", "localhost"),
         port=8080,
         user="ai_analyst",
         catalog="iceberg",
-        schema="retail_gold"
+        schema=schema
     )
 
-@st.cache_data(ttl=300)
-def get_dynamic_schema() -> str:
+@st.cache_data(ttl=120)
+def get_dynamic_schema(target_schema: str = "retail_gold") -> str:
     try:
-        conn = get_trino_conn()
+        conn = get_trino_conn(target_schema)
         cur = conn.cursor()
-        tables = [
-            ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
-            ("iceberg.retail_gold.mart_store_sales_kpis", "dbt Model Mart (Hiệu suất bán hàng theo cửa hàng, AOV, đơn hàng, lợi nhuận do dbt-trino tính toán)"),
-            ("iceberg.retail_gold.v_retail_sales_kpis", "Retail Sales KPIs (AOV - Giá trị trung bình đơn hàng, Đơn giá trung bình)"),
-            ("iceberg.retail_gold.v_supplychain_kpis", "Supply Chain KPIs (Hàng tồn kho theo ngành hàng, DSI - Số ngày tồn kho, Vòng quay tồn kho, Tình trạng kho: FAST_MOVING, HEALTHY, OVERSTOCK_RISK)"),
-            ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Inventory (Tổng số lượng hàng tồn kho theo từng kho hàng: total_units_stored, total_stored_value, mật độ lưu kho)"),
-            ("iceberg.retail_gold.v_omnichannel_kpis", "Omnichannel KPIs (Tỷ trọng doanh thu từng kênh Store/Web/Catalog, Biên lợi nhuận)"),
-            ("iceberg.retail_gold.v_promotion_roi_kpis", "Promotion ROI KPIs (Tỷ suất sinh lời chiến dịch quảng cáo ROI %, AOV theo khuyến mãi)"),
-            ("iceberg.retail_gold.mart_customer_segmentation", "Customer Segmentation (Phân khúc khách hàng 360 độ theo quốc gia, giới tính, học vấn, tín dụng)"),
-            ("iceberg.retail_gold.mart_returns_analysis", "Returns Analysis (Phân tích lý do hoàn trả hàng và tổng số tiền hoàn lại)")
-        ]
+        cur.execute(f"SHOW TABLES FROM iceberg.{target_schema}")
+        tables = [r[0] for r in cur.fetchall()]
         parts = []
-        for tbl, desc in tables:
+        for tbl in tables:
             try:
-                cur.execute(f"DESCRIBE {tbl}")
+                cur.execute(f"DESCRIBE iceberg.{target_schema}.{tbl}")
                 cols = [f"{r[0]} ({r[1]})" for r in cur.fetchall()]
-                parts.append(f"Table: {tbl} - {desc}\nColumns: {', '.join(cols)}")
+                parts.append(f"Table: iceberg.{target_schema}.{tbl}\nColumns: {', '.join(cols)}")
             except Exception:
                 pass
-        return "\n\n".join(parts) if parts else "Table: iceberg.retail_gold.semantic_sales_mart (sales_year, sales_month, store_id, store_name, net_revenue, gross_revenue, net_profit)"
-    except Exception:
-        return "Table: iceberg.retail_gold.semantic_sales_mart (sales_year, sales_month, store_id, store_name, net_revenue, gross_revenue, net_profit)"
+        return "\n\n".join(parts) if parts else f"Schema: iceberg.{target_schema}"
+    except Exception as e:
+        return f"Schema: iceberg.{target_schema} (Lỗi quét schema: {e})"
 
-def build_system_prompt() -> str:
-    schema = get_dynamic_schema()
+def build_system_prompt(target_schema: str = "retail_gold") -> str:
+    schema_info = get_dynamic_schema(target_schema)
     return f"""You are an expert Trino SQL Data Analyst for an Apache Iceberg Lakehouse.
 Generate ONLY valid Trino SQL. Think concisely and output the SQL query directly.
 
-Real-time Database Schema (quét trực tiếp từ cơ sở dữ liệu hiện tại):
-{schema}
+Real-time Database Schema for iceberg.{target_schema} (quét trực tiếp từ Lakehouse):
+{schema_info}
 
 Rules:
-- Output ONLY the executable SQL query starting with SELECT. No explanation, no markdown text outside code.
+- Output ONLY the executable SQL query starting with SELECT or WITH. No explanation, no markdown text outside code.
 - STRICT: Use ONLY the exact column names provided in the schema above. Do NOT invent columns that do not exist.
-- Always use full table names: iceberg.retail_gold.semantic_sales_mart or iceberg.retail_gold.customer_gold.
-- Use ROUND(..., 2) for currency/profit.
-- Use COUNT(DISTINCT order_id) for order count.
+- Always use full table names: iceberg.{target_schema}.<table_name>
+- Use ROUND(..., 2) for currency, averages, or profit amounts.
 - Limit top/bottom queries with LIMIT N (default 10).
 - Do not add semicolons at the end of the query.
 """
@@ -155,25 +154,22 @@ Rules:
 def clean_generated_sql(raw_text: str) -> str:
     if not raw_text:
         return ""
-    # 1. Tìm khối ```sql ... ```
     match_code = re.search(r"```(?:sql)?\s*([\s\S]*?)\s*```", raw_text, flags=re.IGNORECASE)
     if match_code:
         sql = match_code.group(1).strip()
     else:
-        # 2. Tìm khối bắt đầu bằng WITH hoặc SELECT
-        match_query = re.search(r"((?:WITH|SELECT)[\s\S]+)", raw_text, flags=re.IGNORECASE)
+        match_query = re.search(r"((?:WITH|SELECT|SHOW|DESCRIBE)[\s\S]+)", raw_text, flags=re.IGNORECASE)
         if match_query:
             sql = match_query.group(1).strip()
         else:
             sql = raw_text.strip()
     
-    # 3. Làm sạch ký tự thừa và dấu chấm phẩy cuối dòng
     sql = re.sub(r"^```(sql)?\s*", "", sql, flags=re.IGNORECASE)
     sql = re.sub(r"\s*```$", "", sql)
     sql = sql.rstrip("; \t\n")
     return sql
 
-def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, model: str) -> str:
+def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, model: str, target_schema: str) -> str:
     endpoint = url.rstrip("/")
     if not endpoint.endswith("/chat/completions"):
         endpoint = f"{endpoint}/chat/completions"
@@ -182,13 +178,12 @@ def generate_sql_with_openai_compatible(user_prompt: str, key: str, url: str, mo
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json"
     }
-    sys_prompt = build_system_prompt()
+    sys_prompt = build_system_prompt(target_schema)
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": f"""User question: {user_prompt}
-Generate Trino SQL query:"""}
+            {"role": "user", "content": f"User question: {user_prompt}\nGenerate Trino SQL query:"}
         ],
         "max_tokens": 1000,
         "temperature": 0.1
@@ -200,106 +195,17 @@ Generate Trino SQL query:"""}
     raw_content = choice.get("content") or choice.get("reasoning_content") or ""
     return clean_generated_sql(str(raw_content).strip())
 
-def generate_sql_with_gemini(user_prompt: str, key: str, model: str) -> str:
+def generate_sql_with_gemini(user_prompt: str, key: str, model: str, target_schema: str) -> str:
     if not HAS_GENAI:
         raise RuntimeError("Thư viện google-generativeai chưa được cài đặt")
     genai.configure(api_key=key)
     m = genai.GenerativeModel(model)
-    full_prompt = f"""{build_system_prompt()}
+    full_prompt = f"""{build_system_prompt(target_schema)}
 Question: {user_prompt}
 Trino SQL:"""
     resp = m.generate_content(full_prompt)
     raw_content = resp.text.strip()
     return clean_generated_sql(raw_content)
-
-def parse_natural_language_to_sql(user_prompt: str) -> str:
-    p = user_prompt.lower()
-    
-    if p.strip().upper().startswith("SELECT"):
-        return user_prompt.strip()
-
-    limit = 5
-    match_limit = re.search(r"top\s*(\d+)", p)
-    if match_limit:
-        limit = int(match_limit.group(1))
-    elif "10" in p:
-        limit = 10
-
-    order_dir = "DESC"
-    if any(k in p for k in ["thấp nhất", "ít nhất", "kém nhất", "bottom", "lowest"]):
-        order_dir = "ASC"
-
-    if any(k in p for k in ["lợi nhuận", "profit", "lãi"]):
-        metric_col = "ROUND(SUM(net_profit), 2)"
-        metric_alias = "total_profit"
-    elif any(k in p for k in ["số đơn", "đơn hàng", "lượt mua", "order"]):
-        metric_col = "COUNT(DISTINCT order_id)"
-        metric_alias = "total_orders"
-    elif any(k in p for k in ["số lượng", "chiếc", "cái", "quantity"]):
-        metric_col = "SUM(quantity_sold)"
-        metric_alias = "total_quantity"
-    else:
-        metric_col = "ROUND(SUM(net_revenue), 2)"
-        metric_alias = "total_revenue"
-
-    if any(k in p for k in ["cửa hàng", "store", "chi nhánh", "shop"]):
-        dim_col = "store_name"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE store_name IS NOT NULL"
-    elif any(k in p for k in ["danh mục", "ngành hàng", "loại", "category"]):
-        dim_col = "category"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE category IS NOT NULL"
-    elif any(k in p for k in ["thương hiệu", "hãng", "brand"]):
-        dim_col = "brand"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE brand IS NOT NULL"
-    elif any(k in p for k in ["khu vực", "bang", "tiểu bang", "state"]):
-        dim_col = "store_state"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE store_state IS NOT NULL"
-    elif any(k in p for k in ["năm", "year"]):
-        dim_col = "sales_year"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE sales_year IS NOT NULL"
-    elif any(k in p for k in ["tháng", "month"]):
-        dim_col = "sales_month"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE sales_month IS NOT NULL"
-    elif any(k in p for k in ["quốc gia", "country"]) or ("khách hàng" in p and "bán chạy" not in p):
-        return f"""SELECT country, COUNT(*) AS total_customers 
-FROM iceberg.retail_gold.customer_gold 
-GROUP BY country 
-ORDER BY total_customers {order_dir} 
-LIMIT {limit}"""
-    else:
-        dim_col = "product_name"
-        table = "iceberg.retail_gold.semantic_sales_mart"
-        where_clause = "WHERE product_name IS NOT NULL"
-
-    sql = f"""SELECT {dim_col}, {metric_col} AS {metric_alias}
-FROM {table}
-{where_clause}
-GROUP BY {dim_col}
-ORDER BY {metric_alias} {order_dir}
-LIMIT {limit}"""
-    return sql.strip()
-
-# Gợi ý nhanh
-st.subheader("💡 Câu hỏi mẫu:")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    if st.button("🏪 Top cửa hàng bán chạy"):
-        st.session_state["prompt_input"] = "top cửa hàng bán chạy nhất"
-with col2:
-    if st.button("🏆 Top 5 sản phẩm doanh thu cao"):
-        st.session_state["prompt_input"] = "top 5 sản phẩm bán chạy nhất"
-with col3:
-    if st.button("📊 Doanh thu theo danh mục"):
-        st.session_state["prompt_input"] = "doanh thu theo danh mục"
-with col4:
-    if st.button("👥 Khách hàng theo quốc gia"):
-        st.session_state["prompt_input"] = "khách hàng theo quốc gia"
 
 # Lịch sử chat
 if "messages" not in st.session_state:
@@ -319,7 +225,7 @@ for msg in st.session_state.messages:
             elif isinstance(c_info, (tuple, list)) and len(c_info) == 2:
                 render_chart(msg["df"], "bar", c_info[0], c_info[1])
 
-user_input = st.chat_input("Nhập câu hỏi phân tích bằng tiếng Việt hoặc SQL...")
+user_input = st.chat_input(f"Nhập câu hỏi phân tích cho schema '{selected_schema}' hoặc nhập trực tiếp câu SQL...")
 prompt = st.session_state.pop("prompt_input", None) or user_input
 
 if prompt:
@@ -328,60 +234,67 @@ if prompt:
 
     sql = None
     engine_used = ""
-    if api_key:
+    is_direct_sql = prompt.strip().upper().startswith(("SELECT", "WITH", "SHOW", "DESCRIBE"))
+
+    if is_direct_sql:
+        sql = clean_generated_sql(prompt)
+        engine_used = "Truy vấn trực tiếp (Direct SQL)"
+    elif api_key:
         try:
-            with st.spinner(f"🤖 {model_name} đang sinh câu lệnh SQL..."):
+            with st.spinner(f"🤖 {model_name} đang phân tích cấu trúc {selected_schema} để sinh SQL..."):
                 if provider.startswith("FPT AI"):
-                    sql = generate_sql_with_openai_compatible(prompt, api_key, base_url, model_name)
+                    sql = generate_sql_with_openai_compatible(prompt, api_key, base_url, model_name, selected_schema)
                 else:
-                    sql = generate_sql_with_gemini(prompt, api_key, model_name)
+                    sql = generate_sql_with_gemini(prompt, api_key, model_name, selected_schema)
                 engine_used = f"{model_name} ({provider})"
         except Exception as err:
-            st.warning(f"⚠️ Không thể gọi API LLM ({err}). Tự động chuyển về Smart Rule Parser.")
-            sql = parse_natural_language_to_sql(prompt)
-            engine_used = "Smart Rule Parser (Fallback)"
-    else:
-        sql = parse_natural_language_to_sql(prompt)
-        engine_used = "Smart Rule Parser"
-
-    with st.chat_message("assistant"):
-        st.markdown(f"**Câu lệnh SQL do {engine_used} sinh:**")
-        st.code(sql, language="sql")
-
-        try:
-            conn = get_trino_conn()
-            cursor = conn.cursor()
-            cursor.execute(sql)
-            columns = [desc[0] for desc in cursor.description]
-            data = cursor.fetchall()
-            df = pd.DataFrame(data, columns=columns)
-
-            st.dataframe(df, use_container_width=True)
-
-            chart_data = None
-            for col in df.columns[1:]:
-                try:
-                    df[col] = pd.to_numeric(df[col])
-                except Exception:
-                    pass
-
-            if len(df.columns) >= 2 and pd.api.types.is_numeric_dtype(df[df.columns[1]]):
-                col_x, col_y = df.columns[0], df.columns[1]
-                ctype = detect_chart_type(prompt)
-                render_chart(df, ctype, col_x, col_y)
-                chart_data = {"type": ctype, "cols": (col_x, col_y)}
-
-            res_payload = {
-                "role": "assistant",
-                "content": f"Kết quả phân tích từ Lakehouse ({engine_used}):",
-                "sql": sql,
-                "df": df
-            }
-            if chart_data:
-                res_payload["chart"] = chart_data
-            st.session_state.messages.append(res_payload)
-
-        except Exception as e:
-            err_msg = f"Lỗi truy vấn Trino: {e}"
+            err_msg = f"⚠️ Lỗi khi gọi AI ({err}). Vui lòng kiểm tra API Key hoặc nhập trực tiếp câu lệnh SQL."
             st.error(err_msg)
             st.session_state.messages.append({"role": "assistant", "content": err_msg})
+    else:
+        warn_msg = "⚠️ Vui lòng cấu hình API Key ở Sidebar để AI tự sinh SQL, hoặc nhập trực tiếp câu lệnh SQL bắt đầu bằng SELECT/WITH."
+        st.warning(warn_msg)
+        st.session_state.messages.append({"role": "assistant", "content": warn_msg})
+
+    if sql:
+        with st.chat_message("assistant"):
+            st.markdown(f"**Câu lệnh SQL do {engine_used} thực thi:**")
+            st.code(sql, language="sql")
+
+            try:
+                conn = get_trino_conn(selected_schema)
+                cursor = conn.cursor()
+                cursor.execute(sql)
+                columns = [desc[0] for desc in cursor.description]
+                data = cursor.fetchall()
+                df = pd.DataFrame(data, columns=columns)
+
+                st.dataframe(df, use_container_width=True)
+
+                chart_data = None
+                for col in df.columns[1:]:
+                    try:
+                        df[col] = pd.to_numeric(df[col])
+                    except Exception:
+                        pass
+
+                if len(df.columns) >= 2 and pd.api.types.is_numeric_dtype(df[df.columns[1]]):
+                    col_x, col_y = df.columns[0], df.columns[1]
+                    ctype = detect_chart_type(prompt)
+                    render_chart(df, ctype, col_x, col_y)
+                    chart_data = {"type": ctype, "cols": (col_x, col_y)}
+
+                res_payload = {
+                    "role": "assistant",
+                    "content": f"Kết quả phân tích từ Lakehouse ({engine_used}):",
+                    "sql": sql,
+                    "df": df
+                }
+                if chart_data:
+                    res_payload["chart"] = chart_data
+                st.session_state.messages.append(res_payload)
+
+            except Exception as e:
+                err_msg = f"Lỗi truy vấn Trino: {e}"
+                st.error(err_msg)
+                st.session_state.messages.append({"role": "assistant", "content": err_msg})
