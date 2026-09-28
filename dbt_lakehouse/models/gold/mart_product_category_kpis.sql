@@ -4,6 +4,8 @@
 ) }}
 
 SELECT 
+    s.sales_year,
+    s.sales_month,
     p.category,
     p.brand,
     COUNT(DISTINCT s.order_id) AS total_orders,
@@ -14,4 +16,4 @@ SELECT
     CURRENT_TIMESTAMP AS _calculated_at
 FROM {{ ref('fct_sales_clean') }} s
 INNER JOIN {{ ref('dim_products') }} p ON s.item_id = p.item_id
-GROUP BY p.category, p.brand
+GROUP BY s.sales_year, s.sales_month, p.category, p.brand

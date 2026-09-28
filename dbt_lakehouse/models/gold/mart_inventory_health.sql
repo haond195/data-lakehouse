@@ -4,6 +4,9 @@
 ) }}
 
 SELECT 
+    inventory_year,
+    inventory_month,
+    inventory_date,
     warehouse_name,
     warehouse_city,
     warehouse_state,
@@ -14,4 +17,4 @@ SELECT
     CURRENT_TIMESTAMP AS _calculated_at
 FROM {{ ref('fct_inventory_balance') }}
 WHERE warehouse_name IS NOT NULL
-GROUP BY warehouse_name, warehouse_city, warehouse_state, category
+GROUP BY inventory_year, inventory_month, inventory_date, warehouse_name, warehouse_city, warehouse_state, category
