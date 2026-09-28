@@ -113,6 +113,7 @@ def get_dynamic_schema() -> str:
         cur = conn.cursor()
         tables = [
             ("iceberg.retail_gold.semantic_sales_mart", "Sales Mart (Doanh số, Đơn hàng, Cửa hàng)"),
+            ("iceberg.retail_gold.mart_store_sales_kpis", "dbt Model Mart (Hiệu suất bán hàng theo cửa hàng, AOV, đơn hàng, lợi nhuận do dbt-trino tính toán)"),
             ("iceberg.retail_gold.v_retail_sales_kpis", "Retail Sales KPIs (AOV - Giá trị trung bình đơn hàng, Đơn giá trung bình)"),
             ("iceberg.retail_gold.v_supplychain_kpis", "Supply Chain KPIs (Hàng tồn kho theo ngành hàng, DSI - Số ngày tồn kho, Vòng quay tồn kho, Tình trạng kho: FAST_MOVING, HEALTHY, OVERSTOCK_RISK)"),
             ("iceberg.retail_gold.mart_warehouse_utilization", "Warehouse Inventory (Tổng số lượng hàng tồn kho theo từng kho hàng: total_units_stored, total_stored_value, mật độ lưu kho)"),
