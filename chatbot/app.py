@@ -33,20 +33,97 @@ try:
 except ImportError:
     HAS_GENAI = False
 
-st.set_page_config(page_title="AI Data Analyst (Trino + Iceberg)", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="AI Data Analyst (Trino + Iceberg)",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# CSS Font chuẩn Inter và giao diện tinh tế
+# CSS Font chuẩn Inter - không đè lên Material Icons của Streamlit
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-html, body, [class*="css"], .stMarkdown, p, span, h1, h2, h3, button, input {
+html, body, p, h1, h2, h3, input, textarea {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
+# Kết nối Trino
+@st.cache_resource
+def get_trino_conn(catalog: str = "iceberg_stg", schema: str = "stg_gold"):
+    return connect(
+        host=os.getenv("TRINO_HOST", "localhost"),
+        port=8080,
+        user="ai_analyst",
+        catalog=catalog,
+        schema=schema
+    )
+
+@st.cache_data(ttl=60)
+def get_available_catalogs():
+    try:
+        conn = get_trino_conn("iceberg_stg", "stg_gold")
+        cur = conn.cursor()
+        cur.execute("SHOW CATALOGS")
+        cats = [r[0] for r in cur.fetchall() if r[0] not in ['system', 'information_schema', 'lakehouse']]
+        order = {"iceberg_stg": 0, "iceberg": 1, "tpcds": 2}
+        cats.sort(key=lambda x: order.get(x, 99))
+        return cats if cats else ["iceberg_stg", "iceberg"]
+    except Exception:
+        return ["iceberg_stg", "iceberg", "tpcds"]
+
+@st.cache_data(ttl=60)
+def get_available_schemas(catalog_name: str):
+    try:
+        conn = get_trino_conn(catalog_name, "information_schema")
+        cur = conn.cursor()
+        cur.execute(f"SHOW SCHEMAS FROM {catalog_name}")
+        schemas = [r[0] for r in cur.fetchall() if r[0] not in ['information_schema', 'system'] and not r[0].startswith('retail_gold_')]
+        order = {"stg_gold": 0, "retail_gold": 1, "stg_silver": 2, "retail_silver": 3, "stg_bronze": 4, "retail_bronze": 5, "demo_scd": 6, "sf1": 7}
+        schemas.sort(key=lambda x: order.get(x, 99))
+        return schemas if schemas else ["default"]
+    except Exception:
+        return ["stg_gold", "stg_silver", "stg_bronze", "demo_scd"] if catalog_name == "iceberg_stg" else ["retail_gold", "retail_silver", "retail_bronze"]
+
 st.title("🤖 AI Data Analyst Chatbot")
 st.markdown("Trợ lý phân tích dữ liệu tự động truy vấn vào **Trino**, **Apache Iceberg Lakehouse**.")
+
+# Bộ chọn Catalog & Schema hiển thị trực tiếp ngay đầu trang
+st.markdown("##### 🎯 Chọn Nguồn Dữ Liệu Phân Tích:")
+col_cat, col_sch = st.columns(2)
+
+catalogs = get_available_catalogs()
+with col_cat:
+    selected_catalog = st.selectbox(
+        "🗄️ Catalog",
+        catalogs,
+        index=0,
+        help="Chọn catalog từ Trino (iceberg_stg, iceberg, tpcds,...)"
+    )
+
+schemas = get_available_schemas(selected_catalog)
+with col_sch:
+    selected_schema = st.selectbox(
+        "📁 Schema",
+        schemas,
+        index=0,
+        help=f"Chọn schema thuộc catalog '{selected_catalog}'"
+    )
+
+with st.expander(f"📋 Bảng khả dụng trong `{selected_catalog}.{selected_schema}`", expanded=False):
+    try:
+        conn = get_trino_conn(selected_catalog, selected_schema)
+        cur = conn.cursor()
+        cur.execute(f"SHOW TABLES FROM {selected_catalog}.{selected_schema}")
+        tbl_list = [r[0] for r in cur.fetchall()]
+        if tbl_list:
+            st.write(", ".join([f"`{t}`" for t in tbl_list]))
+        else:
+            st.write("*(Chưa có bảng nào)*")
+    except Exception as e:
+        st.write(f"Lỗi: {e}")
 
 # Sidebar cấu hình Nhà cung cấp AI
 st.sidebar.header("⚙️ Cấu hình Nhà Cung Cấp AI")
@@ -93,77 +170,6 @@ else:
         st.sidebar.success(f"🟢 Kích hoạt: {model_name}")
     else:
         st.sidebar.info("⚪ Nhập API Key bên trên để bật AI LLM")
-
-# Kết nối Trino
-@st.cache_resource
-def get_trino_conn(catalog: str = "iceberg_stg", schema: str = "stg_gold"):
-    return connect(
-        host=os.getenv("TRINO_HOST", "localhost"),
-        port=8080,
-        user="ai_analyst",
-        catalog=catalog,
-        schema=schema
-    )
-
-@st.cache_data(ttl=60)
-def get_available_catalogs():
-    try:
-        conn = get_trino_conn("iceberg_stg", "stg_gold")
-        cur = conn.cursor()
-        cur.execute("SHOW CATALOGS")
-        cats = [r[0] for r in cur.fetchall() if r[0] not in ['system', 'information_schema', 'lakehouse']]
-        order = {"iceberg_stg": 0, "iceberg": 1, "tpcds": 2}
-        cats.sort(key=lambda x: order.get(x, 99))
-        return cats if cats else ["iceberg_stg", "iceberg"]
-    except Exception:
-        return ["iceberg_stg", "iceberg", "tpcds"]
-
-@st.cache_data(ttl=60)
-def get_available_schemas(catalog_name: str):
-    try:
-        conn = get_trino_conn(catalog_name, "information_schema")
-        cur = conn.cursor()
-        cur.execute(f"SHOW SCHEMAS FROM {catalog_name}")
-        schemas = [r[0] for r in cur.fetchall() if r[0] not in ['information_schema', 'system'] and not r[0].startswith('retail_gold_')]
-        order = {"stg_gold": 0, "retail_gold": 1, "stg_silver": 2, "retail_silver": 3, "stg_bronze": 4, "retail_bronze": 5, "sf1": 6}
-        schemas.sort(key=lambda x: order.get(x, 99))
-        return schemas if schemas else ["default"]
-    except Exception:
-        return ["stg_gold", "stg_silver", "stg_bronze"] if catalog_name == "iceberg_stg" else ["retail_gold", "retail_silver", "retail_bronze"]
-
-# Cấu hình Catalog & Schema
-st.sidebar.markdown("---")
-st.sidebar.header("🎯 Cấu hình Lakehouse")
-
-catalogs = get_available_catalogs()
-selected_catalog = st.sidebar.selectbox(
-    "1. Chọn Catalog",
-    catalogs,
-    index=0,
-    help="Danh sách catalog được quét tự động từ Trino (iceberg_stg, iceberg, tpcds,...)"
-)
-
-schemas = get_available_schemas(selected_catalog)
-selected_schema = st.sidebar.selectbox(
-    "2. Chọn Schema",
-    schemas,
-    index=0,
-    help=f"Danh sách schema được quét tự động từ catalog '{selected_catalog}'"
-)
-
-with st.sidebar.expander("📋 Xem danh sách bảng trong Schema"):
-    try:
-        conn = get_trino_conn(selected_catalog, selected_schema)
-        cur = conn.cursor()
-        cur.execute(f"SHOW TABLES FROM {selected_catalog}.{selected_schema}")
-        tbl_list = [r[0] for r in cur.fetchall()]
-        if tbl_list:
-            for t in tbl_list:
-                st.write(f"- `{t}`")
-        else:
-            st.write("*(Chưa có bảng)*")
-    except Exception as e:
-        st.write(f"Lỗi: {e}")
 
 @st.cache_data(ttl=120)
 def get_dynamic_schema(target_catalog: str, target_schema: str) -> str:
