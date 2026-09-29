@@ -70,9 +70,12 @@
 <div id="ai-sidebar-container">
   <div id="ai-sidebar-header">
     <span>🤖 AI Data Analyst (Trino + Iceberg)</span>
-    <button id="ai-close-btn" title="Đóng">&times;</button>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <a id="ai-newtab-btn" href="http://localhost:8501" target="_blank" title="Mở toàn màn hình trong tab mới" style="color: white; text-decoration: none; font-size: 13px; font-weight: normal; opacity: 0.95;">↗ Toàn màn hình</a>
+      <button id="ai-close-btn" title="Đóng">&times;</button>
+    </div>
   </div>
-  <iframe id="ai-iframe" src="http://localhost:8501/?embed=true"></iframe>
+  <iframe id="ai-iframe" src="about:blank"></iframe>
 </div>
 
 <script>
@@ -80,14 +83,70 @@
     var btn = document.getElementById('ai-chat-btn');
     var sidebar = document.getElementById('ai-sidebar-container');
     var closeBtn = document.getElementById('ai-close-btn');
+    var iframe = document.getElementById('ai-iframe');
+    var newtabBtn = document.getElementById('ai-newtab-btn');
+
+    async function getSupersetUsername() {
+      // 1. Gọi trực tiếp endpoint xác thực /api/v1/me/ của Superset
+      try {
+        var res = await fetch('/api/v1/me/', { credentials: 'include' });
+        if (res.ok) {
+          var data = await res.json();
+          if (data && data.result && data.result.username) {
+            return data.result.username;
+          }
+        }
+      } catch (e) {
+        console.warn("fetch /api/v1/me/ error:", e);
+      }
+
+      // 2. Dự phòng: Đọc từ DOM data-bootstrap
+      try {
+        var app = document.getElementById('app');
+        if (app) {
+          var raw = app.getAttribute('data-bootstrap');
+          if (raw) {
+            var bs = JSON.parse(raw);
+            if (bs && bs.user && bs.user.username) {
+              return bs.user.username;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Lỗi đọc DOM Superset:", e);
+      }
+      return '';
+    }
+
+    async function syncUserUrl() {
+      var user = await getSupersetUsername();
+      var baseUrl = 'http://localhost:8501/';
+      var iframeUrl = user ? (baseUrl + '?embed=true&user=' + encodeURIComponent(user)) : (baseUrl + '?embed=true');
+      var fullUrl = user ? (baseUrl + '?user=' + encodeURIComponent(user)) : baseUrl;
+
+      if (iframe && iframe.src !== iframeUrl) {
+        iframe.src = iframeUrl;
+      }
+      if (newtabBtn) {
+        newtabBtn.href = fullUrl;
+      }
+    }
 
     if (btn && sidebar && closeBtn) {
-      btn.onclick = function() {
+      btn.onclick = async function() {
+        await syncUserUrl();
         sidebar.classList.toggle('open');
       };
       closeBtn.onclick = function() {
         sidebar.classList.remove('open');
       };
+    }
+
+    // Tự động đồng bộ URL khi tải trang
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncUserUrl);
+    } else {
+      syncUserUrl();
     }
   })();
 </script>

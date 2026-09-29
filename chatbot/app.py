@@ -50,19 +50,95 @@ html, body, p, h1, h2, h3, input, textarea {
 </style>
 """, unsafe_allow_html=True)
 
-# Kết nối Trino
-@st.cache_resource
+# Superset API Endpoint & Xác thực
+SUPERSET_API_URL = os.getenv(
+    "SUPERSET_API_URL",
+    "http://superset:8088/api/v1/security/login" if os.getenv("TRINO_HOST") == "trino" else "http://localhost:8089/api/v1/security/login"
+)
+
+def verify_superset_credentials(username: str, password: str):
+    try:
+        resp = requests.post(
+            SUPERSET_API_URL,
+            json={"username": username, "password": password, "provider": "db", "refresh": True},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            return True, "Đăng nhập thành công"
+        return False, "Tài khoản hoặc mật khẩu Superset không chính xác."
+    except Exception as e:
+        return False, f"Không thể kết nối Superset API: {e}"
+
+# Chế độ nhúng từ Superset (Strict Mode)
+is_embedded = ("embed" in st.query_params) and (str(st.query_params.get("embed")).lower() in ["true", "1", ""])
+query_user = st.query_params.get("user")
+
+if query_user and str(query_user).strip():
+    clean_user = str(query_user).strip()
+    if st.session_state.get("username") != clean_user:
+        st.session_state.messages = []
+        st.cache_data.clear()
+    st.session_state.authenticated = True
+    st.session_state.username = clean_user
+
+# Quản lý phiên đăng nhập
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+    st.session_state.username = None
+
+# Nếu đang chạy nhúng trong Superset (Strict Mode) nhưng chưa có user
+if is_embedded and not st.session_state.authenticated:
+    st.warning("🔒 **Chế độ Khóa cứng Superset (Strict Mode)**\n\nBạn chưa đăng nhập vào Apache Superset. Vui lòng đăng nhập trên Superset để sử dụng trợ lý AI.")
+    st.stop()
+
+if not st.session_state.authenticated:
+    st.title("🔐 Đăng nhập AI Lakehouse Chatbot")
+    st.markdown("Đăng nhập bằng tài khoản **Apache Superset** để tự động phân quyền dữ liệu (RBAC) trên Lakehouse.")
+
+    col_l, col_r = st.columns([1, 1])
+    with col_l:
+        with st.form("superset_login"):
+            st.markdown("#### 🔑 Nhập tài khoản Superset")
+            u_input = st.text_input("Tài khoản", value="", placeholder="admin hoặc analyst")
+            p_input = st.text_input("Mật khẩu", type="password", value="", placeholder="Nhập mật khẩu Superset")
+            submitted = st.form_submit_button("Đăng nhập", use_container_width=True)
+            if submitted:
+                if not u_input.strip() or not p_input.strip():
+                    st.error("Vui lòng nhập đầy đủ tài khoản và mật khẩu.")
+                else:
+                    with st.spinner("Đang xác thực với Superset..."):
+                        ok, msg = verify_superset_credentials(u_input.strip(), p_input.strip())
+                        if ok:
+                            st.session_state.authenticated = True
+                            st.session_state.username = u_input.strip()
+                            st.cache_data.clear()
+                            st.success(f"Chào mừng {u_input}! Đang tải...")
+                            st.rerun()
+                        else:
+                            st.error(msg)
+    with col_r:
+        st.info("""
+        **Quy tắc phân quyền tài khoản (Trino RBAC):**
+        - 👤 **`analyst`**: Chỉ đọc (`SELECT`) tầng **Gold** (`stg_gold`, `retail_gold`). Bị **chặn hoàn toàn** khi truy vấn tầng **Bronze / Silver**.
+        - 🛡️ **`admin`**: Toàn quyền truy vấn tất cả Catalog & Schema trên Lakehouse.
+        """)
+    st.stop()
+
+# Kết nối Trino theo User đăng nhập từ Superset
 def get_trino_conn(catalog: str = "iceberg_stg", schema: str = "stg_gold"):
+    current_user = st.session_state.get("username")
+    if not current_user:
+        raise RuntimeError("Chưa xác thực tài khoản! Vui lòng đăng nhập.")
     return connect(
         host=os.getenv("TRINO_HOST", "localhost"),
         port=8080,
-        user="ai_analyst",
+        user=current_user,
         catalog=catalog,
         schema=schema
     )
 
 @st.cache_data(ttl=60)
-def get_available_catalogs():
+def get_available_catalogs(username: str):
     try:
         conn = get_trino_conn("iceberg_stg", "stg_gold")
         cur = conn.cursor()
@@ -75,7 +151,7 @@ def get_available_catalogs():
         return ["iceberg_stg", "iceberg", "tpcds"]
 
 @st.cache_data(ttl=60)
-def get_available_schemas(catalog_name: str):
+def get_available_schemas(catalog_name: str, username: str):
     try:
         conn = get_trino_conn(catalog_name, "information_schema")
         cur = conn.cursor()
@@ -94,7 +170,11 @@ st.markdown("Trợ lý phân tích dữ liệu tự động truy vấn vào **Tr
 st.markdown("##### 🎯 Chọn Nguồn Dữ Liệu Phân Tích:")
 col_cat, col_sch = st.columns(2)
 
-catalogs = get_available_catalogs()
+current_user = st.session_state.get("username")
+if not current_user:
+    st.stop()
+
+catalogs = get_available_catalogs(current_user)
 with col_cat:
     selected_catalog = st.selectbox(
         "🗄️ Catalog",
@@ -103,7 +183,7 @@ with col_cat:
         help="Chọn catalog từ Trino (iceberg_stg, iceberg, tpcds,...)"
     )
 
-schemas = get_available_schemas(selected_catalog)
+schemas = get_available_schemas(selected_catalog, current_user)
 with col_sch:
     selected_schema = st.selectbox(
         "📁 Schema",
@@ -121,11 +201,31 @@ with st.expander(f"📋 Bảng khả dụng trong `{selected_catalog}.{selected_
         if tbl_list:
             st.write(", ".join([f"`{t}`" for t in tbl_list]))
         else:
-            st.write("*(Chưa có bảng nào)*")
+            st.write("*(Chưa có bảng nào hoặc bạn không có quyền xem)*")
     except Exception as e:
         st.write(f"Lỗi: {e}")
 
-# Sidebar cấu hình Nhà cung cấp AI
+# Sidebar: Thông tin tài khoản Superset & Cấu hình AI
+st.sidebar.markdown(f"### 👤 Người dùng: `{current_user}`")
+if current_user == "admin":
+    st.sidebar.caption("🛡️ Quyền hạn: **Admin (Toàn quyền Lakehouse)**")
+elif current_user == "analyst":
+    st.sidebar.caption("🔒 Quyền hạn: **Analyst (Chỉ đọc tầng Gold)**")
+else:
+    st.sidebar.caption(f"👤 Quyền hạn: **{current_user}**")
+
+if is_embedded:
+    st.sidebar.info("🔒 **Strict Mode:** Danh tính đồng bộ trực tiếp từ Superset. Để đổi tài khoản, vui lòng đăng xuất trên Superset.")
+else:
+    if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.messages = []
+        st.cache_data.clear()
+        st.query_params.clear()
+        st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Cấu hình Nhà Cung Cấp AI")
 provider = st.sidebar.selectbox(
     "Nền tảng AI",

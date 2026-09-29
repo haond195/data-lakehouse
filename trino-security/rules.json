@@ -10,7 +10,7 @@
     },
     {
       "user": "analyst",
-      "catalog": "iceberg",
+      "catalog": "iceberg.*",
       "allow": "read-only"
     },
     {
@@ -53,14 +53,14 @@
     },
     {
       "user": "analyst",
-      "catalog": "iceberg",
-      "schema": "retail_gold",
+      "catalog": "iceberg.*",
+      "schema": "(retail|stg)_gold",
       "privileges": ["SELECT"]
     },
     {
       "user": "analyst",
-      "catalog": "iceberg",
-      "schema": "retail_(bronze|silver)",
+      "catalog": "iceberg.*",
+      "schema": "(retail|stg)_(bronze|silver)",
       "privileges": []
     },
     {
