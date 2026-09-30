@@ -1,0 +1,166 @@
+title: Lakehouse Retail Executive Scorecard
+source: lakehouse_trino
+
+style:
+  frame:
+    width: 1440
+
+variables:
+  channel_filter:
+    input: multiselect
+    column: mart_omnichannel_performance.channel
+
+queries:
+  kpis: |
+    WITH summary AS (
+      SELECT 
+        SUM(total_revenue) AS total_revenue,
+        SUM(total_orders) AS total_orders,
+        SUM(total_profit) AS total_profit,
+        ROUND(SUM(total_profit) * 100.0 / NULLIF(SUM(total_revenue), 0), 2) AS profit_margin_pct,
+        ROUND(SUM(total_revenue) / NULLIF(SUM(total_orders), 0), 2) AS aov
+      FROM lakehouse.retail_gold.mart_omnichannel_performance
+      WHERE 1=1 AND {{ filter('channel', channel_filter) }}
+    )
+    SELECT total_revenue, total_orders, total_profit, profit_margin_pct, aov
+    FROM summary
+
+  monthly_revenue_trend: |
+    SELECT 
+      CONCAT(CAST(sales_year AS VARCHAR), '-', LPAD(CAST(sales_month AS VARCHAR), 2, '0')) AS month_period,
+      channel,
+      SUM(total_revenue) AS revenue
+    FROM lakehouse.retail_gold.mart_omnichannel_performance
+    WHERE 1=1 AND {{ filter('channel', channel_filter) }}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+
+  channel_distribution: |
+    SELECT 
+      channel,
+      SUM(total_revenue) AS revenue,
+      SUM(total_profit) AS profit
+    FROM lakehouse.retail_gold.mart_omnichannel_performance
+    GROUP BY 1
+    ORDER BY 2 DESC
+
+  top_stores: |
+    SELECT 
+      store_name,
+      store_state,
+      SUM(total_orders) AS orders,
+      SUM(total_revenue) AS revenue,
+      SUM(total_profit) AS profit,
+      ROUND(SUM(total_profit) * 100.0 / NULLIF(SUM(total_revenue), 0), 2) AS profit_margin_pct
+    FROM lakehouse.retail_gold.mart_store_sales_kpis
+    GROUP BY 1, 2
+    ORDER BY revenue DESC
+    LIMIT 10
+
+charts:
+  kpi_total_revenue:
+    label: Total Omnichannel Revenue
+    query: kpis
+    type: kpi
+    value: total_revenue
+    style:
+      value:
+        format: currency_whole
+
+  kpi_total_profit:
+    label: Net Profit
+    query: kpis
+    type: kpi
+    value: total_profit
+    style:
+      value:
+        format: currency_whole
+
+  kpi_profit_margin:
+    label: Profit Margin
+    query: kpis
+    type: kpi
+    value: profit_margin_pct
+    style:
+      value:
+        format: percent_whole
+
+  kpi_aov:
+    label: Average Order Value (AOV)
+    query: kpis
+    type: kpi
+    value: aov
+    style:
+      value:
+        format: currency_whole
+
+  channel_trend_chart:
+    title: Monthly Revenue Trend by Channel
+    query: monthly_revenue_trend
+    type: line
+    x: month_period
+    y: revenue
+    color: channel
+    height: 380
+
+  channel_breakdown_bar:
+    title: Revenue & Profit by Sales Channel
+    query: channel_distribution
+    type: bar
+    x: channel
+    y: revenue
+    height: 380
+    style:
+      orientation: vertical
+      axis_y:
+        labels:
+          format: currency_whole
+
+  top_stores_table:
+    title: Top 10 Retail Stores Performance
+    query: top_stores
+    type: table
+    style:
+      columns:
+        store_name:
+          label: Store Name
+        store_state:
+          label: State
+          align: center
+        orders:
+          label: Orders
+          format: integer
+          align: right
+        revenue:
+          label: Total Revenue ($)
+          format: currency_whole
+          align: right
+        profit:
+          label: Net Profit ($)
+          format: currency_whole
+          align: right
+        profit_margin_pct:
+          label: Margin (%)
+          format: percent_whole
+          align: right
+
+rows:
+  - cols:
+      - width: "100%"
+        text: |
+          ### Executive Summary: Retail Lakehouse Operations
+          Real-time metrics compiled directly from **Trino + Iceberg Gold Marts** (`mart_omnichannel_performance`, `mart_store_sales_kpis`).
+
+  - cols:
+      - width: "100%"
+        cols: [kpi_total_revenue, kpi_total_profit, kpi_profit_margin, kpi_aov]
+
+  - cols:
+      - width: "60%"
+        rows: [channel_trend_chart]
+      - width: "40%"
+        rows: [channel_breakdown_bar]
+
+  - cols:
+      - width: "100%"
+        rows: [top_stores_table]

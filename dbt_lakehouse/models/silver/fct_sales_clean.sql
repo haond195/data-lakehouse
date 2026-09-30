@@ -10,6 +10,7 @@ SELECT
     COALESCE(r.store_id, 0) AS store_id,
     COALESCE(s.store_name, 'Online / Non-Store') AS store_name,
     COALESCE(s.state, 'Unknown State') AS store_state,
+    CAST(d.calendar_date AS DATE) AS order_date,
     d.calendar_year AS sales_year,
     d.month_of_year AS sales_month,
     COALESCE(r.raw_quantity, 1) AS quantity,

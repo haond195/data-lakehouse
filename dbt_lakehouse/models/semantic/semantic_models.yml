@@ -1,0 +1,105 @@
+version: 2
+
+semantic_models:
+  - name: time_spine
+    model: ref('metricflow_time_spine')
+    defaults:
+      agg_time_dimension: date_day
+    entities:
+      - name: time_spine_day
+        type: primary
+        expr: date_day
+    dimensions:
+      - name: date_day
+        type: time
+        type_params:
+          time_granularity: day
+
+  - name: store_sales_semantic
+    description: "Semantic model for store sales transactions."
+    model: ref('fct_sales_clean')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: order_id
+        type: primary
+        expr: order_id
+      - name: store_id
+        type: foreign
+        expr: store_id
+      - name: customer_id
+        type: foreign
+        expr: customer_id
+
+    dimensions:
+      - name: order_date
+        type: time
+        expr: order_date
+        type_params:
+          time_granularity: day
+      - name: store_name
+        type: categorical
+        expr: store_name
+      - name: store_state
+        type: categorical
+        expr: store_state
+      - name: sales_year
+        type: categorical
+        expr: sales_year
+
+    measures:
+      - name: net_revenue
+        description: "Total net sales revenue paid by customers."
+        agg: sum
+        expr: net_revenue
+      - name: net_profit
+        description: "Net operating profit from sales."
+        agg: sum
+        expr: net_profit
+      - name: quantity
+        description: "Total number of units sold."
+        agg: sum
+        expr: quantity
+      - name: order_count
+        description: "Total distinct order count."
+        agg: count_distinct
+        expr: order_id
+
+metrics:
+  - name: revenue
+    description: "Total store sales revenue"
+    label: "Total Sales Revenue ($)"
+    type: simple
+    type_params:
+      measure: net_revenue
+
+  - name: profit
+    description: "Total net profit"
+    label: "Net Profit ($)"
+    type: simple
+    type_params:
+      measure: net_profit
+
+  - name: orders
+    description: "Total distinct order count"
+    label: "Order Volume"
+    type: simple
+    type_params:
+      measure: order_count
+
+  - name: average_order_value
+    description: "Average revenue per order transaction (AOV)"
+    label: "Average Order Value (AOV)"
+    type: ratio
+    type_params:
+      numerator: revenue
+      denominator: orders
+
+  - name: profit_margin
+    description: "Percentage of revenue converted to net profit"
+    label: "Profit Margin (%)"
+    type: ratio
+    type_params:
+      numerator: profit
+      denominator: revenue
