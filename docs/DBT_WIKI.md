@@ -1,6 +1,6 @@
-# 📚 Cẩm Nang Kiến Thức Về dbt (Data Build Tool) Cho Data Lakehouse
+#  Kiến Thức Về dbt (Data Build Tool) Cho Data Lakehouse
 
-## 1. dbt Là Gì? (Khái Niệm & Triết Lý)
+## 1. dbt Là Gì?
 
 - **dbt (Data Build Tool)** là chuẩn công nghiệp cho chữ **T (Transform)** trong kiến trúc dữ liệu hiện đại **ELT (Extract - Load - Transform)**.
 - **Triết lý cốt lõi**: Đưa các chuẩn mực tốt nhất của Kỹ nghệ phần mềm (**Software Engineering Best Practices**) vào Phân tích dữ liệu:
