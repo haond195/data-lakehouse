@@ -1,4 +1,4 @@
-#  Kiến Thức Về dbt (Data Build Tool) Cho Data Lakehouse
+# Kiến Thức Về dbt (Data Build Tool) Cho Data Lakehouse
 
 ## 1. dbt Là Gì?
 

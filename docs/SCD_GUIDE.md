@@ -1,4 +1,4 @@
-# 📚 Hướng Dẫn & Kiến Thức Về SCD (Slowly Changing Dimensions)
+#  Hướng Dẫn & Kiến Thức Về SCD (Slowly Changing Dimensions)
 
 ## 1. SCD Là Gì?
 - **SCD (Slowly Changing Dimensions - Chiều Biến Đổi Chậm)** là kỹ thuật trong thiết kế Data Warehouse / Lakehouse để theo dõi và quản lý sự thay đổi của dữ liệu danh mục (Dimension) theo thời gian.

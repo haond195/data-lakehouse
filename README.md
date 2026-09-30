@@ -204,7 +204,8 @@ D:\local-lakehouse\
 │       └── gold/               # 7 Data Marts (mart_product_return_rates, mart_inventory_sales_velocity,...)
 ├── docs\
 │   ├── DBT_WIKI.md             # Cẩm nang kiến thức dbt (ELT, Jinja, Materializations, Tests, DAG)
-│   └── SCD_GUIDE.md            # Cẩm nang kiến thức & Hướng dẫn kiểm thử trực quan SCD Type 1, 2, 3
+│   ├── SCD_GUIDE.md            # Cẩm nang kiến thức & Hướng dẫn kiểm thử trực quan SCD Type 1, 2, 3
+│   └── TRAINING_LOG.md         # Toàn bộ nhật ký kiến thức, kỹ thuật & bài học thực chiến của dự án
 ├── config\
 │   ├── etl_pipeline.yaml           # Cấu hình ETL Bán hàng mẫu
 │   └── inventory_pipeline.yaml     # Cấu hình ETL Tồn kho mẫu
