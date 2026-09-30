@@ -89,3 +89,83 @@ FROM {{ ref('stg_customer') }}
   1. dbt tự động so sánh dữ liệu mới và cũ.
   2. Tự thêm các cột `dbt_valid_from`, `dbt_valid_to`, `dbt_updated_at`.
   3. Tự đóng phiên bản cũ (`dbt_valid_to = now()`) và mở phiên bản mới hoàn toàn tự động.
+
+---
+
+## 4. Mã Nguồn Mẫu SQL Thực Thi SCD Type 1 & Type 2 (Trino / Iceberg)
+
+### 4.1. Mã nguồn SCD Type 1 (Ghi đè bằng MERGE INTO)
+Khi khách hàng cập nhật số điện thoại hoặc sửa lỗi chính tả:
+```sql
+MERGE INTO iceberg.retail_silver.dim_customer_type1 target
+USING staging.customer_updates source
+ON target.customer_id = source.customer_id
+WHEN MATCHED THEN
+    UPDATE SET 
+        phone = source.phone,
+        email = source.email,
+        updated_at = CURRENT_TIMESTAMP
+WHEN NOT MATCHED THEN
+    INSERT (customer_id, customer_name, phone, email, updated_at)
+    VALUES (source.customer_id, source.customer_name, source.phone, source.email, CURRENT_TIMESTAMP);
+```
+
+---
+
+### 4.2. Mã nguồn SCD Type 2 (Đóng mốc cũ & Thêm phiên bản mới)
+Khi khách hàng chuyển địa chỉ từ Hà Nội vào TP.HCM:
+```sql
+-- Bước 1: Đóng hiệu lực dòng cũ (Đổi is_current thành FALSE và set valid_to)
+UPDATE iceberg.retail_silver.dim_customer_type2
+SET 
+    valid_to = DATE '2023-05-15',
+    is_current = FALSE
+WHERE customer_id = 'C001' AND is_current = TRUE;
+
+-- Bước 2: Chèn dòng mới với Surrogate Key mới
+INSERT INTO iceberg.retail_silver.dim_customer_type2 (
+    customer_sk, customer_id, customer_name, city, valid_from, valid_to, is_current
+) VALUES (
+    'SK_C001_V2', 'C001', 'Nguyễn Văn A', 'TP.HCM', DATE '2023-05-16', NULL, TRUE
+);
+```
+
+---
+
+## 5. Mã Nguồn Truy Vấn Dữ Liệu Lịch Sử (As-Of & Current Analysis)
+
+### 5.1. Xem dữ liệu mới nhất (Current View)
+Dành cho các chiến dịch Marketing hoặc liên hệ hiện tại:
+```sql
+SELECT customer_id, customer_name, city
+FROM iceberg.retail_silver.dim_customer_type2
+WHERE is_current = TRUE;
+```
+
+### 5.2. Tái hiện lịch sử tại thời điểm bất kỳ (As-Of Query)
+Để đối soát đơn hàng phát sinh vào ngày `2022-06-01`, khách hàng lúc đó đang ở đâu:
+```sql
+SELECT 
+    f.order_id,
+    f.net_revenue,
+    c.customer_name,
+    c.city AS historical_city
+FROM iceberg.retail_silver.fct_sales_clean f
+JOIN iceberg.retail_silver.dim_customer_type2 c 
+    ON f.customer_id = c.customer_id
+    AND f.sales_date BETWEEN c.valid_from AND COALESCE(c.valid_to, DATE '9999-12-31');
+```
+
+---
+
+## 6. Kiểm Thử Trực Quan Tự Động (Visual Test Script)
+
+Dự án có sẵn script kiểm thử tự động mô phỏng trọn vẹn cả 3 kiểu SCD:
+```powershell
+python scripts/test_scd_visual.py
+```
+Script sẽ tự động:
+1. Tạo schema và bảng demo `iceberg_stg.demo_scd.customer_scd_test`.
+2. Chèn trạng thái ban đầu của khách hàng (`Hà Nội`).
+3. Kích hoạt cập nhật thay đổi thành `TP.HCM` theo từng kiểu SCD Type 1, Type 2, Type 3.
+4. Xuất bảng so sánh trước và sau trực tiếp trên màn hình terminal.
