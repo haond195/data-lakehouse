@@ -203,6 +203,7 @@ D:\local-lakehouse\
 │       ├── silver/             # 10 Dimensions & Clean Facts (fct_returns_unified, fct_inventory_balance,...)
 │       └── gold/               # 7 Data Marts (mart_product_return_rates, mart_inventory_sales_velocity,...)
 ├── docs\
+│   ├── DBT_WIKI.md             # Cẩm nang kiến thức dbt (ELT, Jinja, Materializations, Tests, DAG)
 │   └── SCD_GUIDE.md            # Cẩm nang kiến thức & Hướng dẫn kiểm thử trực quan SCD Type 1, 2, 3
 ├── config\
 │   ├── etl_pipeline.yaml           # Cấu hình ETL Bán hàng mẫu
